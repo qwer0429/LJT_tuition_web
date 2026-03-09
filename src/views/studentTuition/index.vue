@@ -35,7 +35,8 @@
             <el-form-item label="支付方式：" style="width: 100%;">
               <el-select v-model="listQuery.payment_type" placeholder="全部" clearable style="width: 100%;" @change="handleSearch">
                 <el-option label="全年支付" value="yearly" />
-                <el-option label="学期支付" value="semester" />
+                <el-option label="第一学期" value="semester_1" />
+                <el-option label="第二学期" value="semester_2" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -117,18 +118,22 @@
             <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column label="支付方式" align="center" width="100">
+        <el-table-column label="支付方式" align="center" width="120">
           <template slot-scope="scope">
             <el-tag v-if="scope.row.payment_type === 'yearly'" type="primary" size="small">全年支付</el-tag>
-            <el-tag v-else type="warning" size="small">学期支付</el-tag>
+            <el-tag v-else-if="scope.row.payment_type === 'semester_1'" type="warning" size="small">第一学期</el-tag>
+            <el-tag v-else-if="scope.row.payment_type === 'semester_2'" type="warning" size="small">第二学期</el-tag>
+            <el-tag v-else type="info" size="small">{{ scope.row.payment_type }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="折扣类型" align="center" min-width="150">
+        <el-table-column label="折扣类型" align="center" min-width="200">
           <template slot-scope="scope">
             <el-tag v-if="scope.row.is_teacher_child" type="danger" size="small" class="discount-tag">教师子弟</el-tag>
+            <el-tag v-if="scope.row.discount_sibling > 0" type="primary" size="small" class="discount-tag">兄弟姐妹</el-tag>
             <el-tag v-if="scope.row.discount_company > 0" type="warning" size="small" class="discount-tag">公司折扣</el-tag>
             <el-tag v-if="scope.row.discount_alumni > 0" type="success" size="small" class="discount-tag">校友</el-tag>
-            <span v-if="!scope.row.is_teacher_child && !(scope.row.discount_company > 0) && !(scope.row.discount_alumni > 0)">-</span>
+            <el-tag v-if="scope.row.scholarship_amount > 0" type="info" size="small" class="discount-tag">奖学金</el-tag>
+            <span v-if="!scope.row.is_teacher_child && !(scope.row.discount_sibling > 0) && !(scope.row.discount_company > 0) && !(scope.row.discount_alumni > 0) && !(scope.row.scholarship_amount > 0)">-</span>
           </template>
         </el-table-column>
         <el-table-column label="奖学金" prop="scholarship_amount" align="center" width="120">
@@ -207,10 +212,70 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="支付方式" prop="payment_type">
-              <el-radio-group v-model="tuitionForm.payment_type">
+              <el-radio-group v-model="paymentTypeGroup" @change="handlePaymentTypeChange">
                 <el-radio label="yearly">全年支付</el-radio>
                 <el-radio label="semester">学期支付</el-radio>
               </el-radio-group>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row v-if="paymentTypeGroup === 'semester'" :gutter="20">
+          <el-col :span="24">
+            <el-form-item label="选择学期" prop="semester">
+              <el-select v-model="tuitionForm.semester" placeholder="请选择学期" style="width: 100%;" filterable @change="handleSemesterChange">
+                <el-option
+                  v-for="item in semesterOptions"
+                  :key="item.id"
+                  :label="item.name"
+                  :value="item.id"
+                />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="学费期间">
+              <el-input v-model="tuitionForm.tuition_period" placeholder="自动计算，如：2025.08.18-2026.06.19" readonly />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="学费期间天数">
+              <el-input-number v-model="tuitionForm.tuition_period_days" :min="0" :precision="0" style="width: 100%;" readonly />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="开始日期">
+              <el-date-picker
+                v-model="tuitionForm.start_date"
+                type="date"
+                placeholder="选择开始日期"
+                value-format="yyyy-MM-dd"
+                style="width: 100%;"
+                @change="handleDateChange"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="结束日期">
+              <el-date-picker
+                v-model="tuitionForm.end_date"
+                type="date"
+                placeholder="选择结束日期"
+                value-format="yyyy-MM-dd"
+                style="width: 100%;"
+                @change="handleDateChange"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="注册费（新生）">
+              <el-input-number v-model="tuitionForm.registration_fee" :min="0" :precision="2" style="width: 100%;" />
+              <span class="form-tip">注册费不为空则表示新生</span>
             </el-form-item>
           </el-col>
         </el-row>
@@ -223,24 +288,24 @@
           </el-col>
           <el-col :span="8">
             <el-form-item label="校友折扣">
-              <el-input-number v-model="tuitionForm.discount_alumni" :min="0" :precision="2" style="width: 100%;" />
+              <el-input-number v-model="tuitionForm.discount_alumni" :min="0" :precision="2" :controls="true" controls-position="right" style="width: 100%;" />
             </el-form-item>
           </el-col>
           <el-col :span="8">
             <el-form-item label="公司折扣">
-              <el-input-number v-model="tuitionForm.discount_company" :min="0" :precision="2" style="width: 100%;" />
+              <el-input-number v-model="tuitionForm.discount_company" :min="0" :precision="2" :controls="true" controls-position="right" style="width: 100%;" />
             </el-form-item>
           </el-col>
         </el-row>
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="奖学金金额">
-              <el-input-number v-model="tuitionForm.scholarship_amount" :min="0" :precision="2" style="width: 100%;" />
+              <el-input-number v-model="tuitionForm.scholarship_amount" :min="0" :precision="2" :controls="true" controls-position="right" style="width: 100%;" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="学弟姐妹折扣">
-              <el-input-number v-model="tuitionForm.discount_sibling" :min="0" :precision="2" style="width: 100%;" />
+              <el-input-number v-model="tuitionForm.discount_sibling" :min="0" :precision="2" :controls="true" controls-position="right" style="width: 100%;" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -253,11 +318,19 @@
 
     <!-- 导入对话框 -->
     <el-dialog title="批量导入学费信息" :visible.sync="importDialogVisible" width="500px">
+      <el-form ref="importForm" :model="importForm" label-width="80px">
+        <el-form-item label="学年" prop="academic_year" :rules="[{ required: true, message: '请选择或输入学年', trigger: 'change' }]">
+          <el-select v-model="importForm.academic_year" placeholder="请选择或输入学年" style="width: 100%;" filterable allow-create default-first-option>
+            <el-option v-for="year in academicYearOptions" :key="year" :label="year" :value="year" />
+          </el-select>
+        </el-form-item>
+      </el-form>
       <el-upload
         ref="upload"
         class="upload-demo"
         drag
         :action="uploadAction"
+        :data="importForm"
         :on-success="handleUploadSuccess"
         :on-error="handleUploadError"
         :before-upload="beforeUpload"
@@ -280,7 +353,7 @@
     <el-dialog title="学费详情" :visible.sync="detailDialogVisible" width="700px">
       <div v-if="detailData">
         <!-- 学期选择 -->
-        <el-form v-if="detailData.payment_type === 'semester'" :inline="true" class="detail-semester-form" style="margin-bottom: 20px;">
+        <el-form v-if="detailData.payment_type === 'semester_1' || detailData.payment_type === 'semester_2'" :inline="true" class="detail-semester-form" style="margin-bottom: 20px;">
           <el-form-item label="选择学期：">
             <el-select v-model="detailSemesterId" placeholder="请选择学期" style="width: 320px;" @change="handleDetailSemesterChange">
               <el-option
@@ -306,12 +379,14 @@
           <el-descriptions-item label="年级">{{ detailData.grade }}</el-descriptions-item>
           <el-descriptions-item label="支付方式">
             <el-tag v-if="detailData.payment_type === 'yearly'" type="success">全年支付</el-tag>
-            <el-tag v-else type="warning">学期支付</el-tag>
+            <el-tag v-else-if="detailData.payment_type === 'semester_1'" type="warning">第一学期</el-tag>
+            <el-tag v-else-if="detailData.payment_type === 'semester_2'" type="warning">第二学期</el-tag>
+            <el-tag v-else type="info">{{ detailData.payment_type }}</el-tag>
           </el-descriptions-item>
         </el-descriptions>
         
         <!-- 学期信息（仅学期支付显示） -->
-        <el-descriptions v-if="detailData.payment_type === 'semester'" :column="2" border title="学期信息" style="margin-top: 15px;">
+        <el-descriptions v-if="detailData.payment_type === 'semester_1' || detailData.payment_type === 'semester_2'" :column="2" border title="学期信息" style="margin-top: 15px;">
           <el-descriptions-item label="学期">{{ detailData.semester_name || '当前学期' }}</el-descriptions-item>
           <el-descriptions-item label="学期费率">{{ detailData.semester_rate > 0 ? detailData.semester_rate + '%' : '按天数计算' }}</el-descriptions-item>
           <el-descriptions-item label="学期总工作日">{{ detailData.semester_days }}天</el-descriptions-item>
@@ -327,7 +402,7 @@
           <el-descriptions-item label="注册费">
             <span>¥{{ detailData.registration_fee }}</span>
           </el-descriptions-item>
-          <el-descriptions-item v-if="detailData.payment_type === 'semester'" label="学期学费">
+          <el-descriptions-item v-if="detailData.payment_type === 'semester_1' || detailData.payment_type === 'semester_2'" label="学期学费">
             <span>¥{{ detailData.semester_tuition_before_discount }}</span>
           </el-descriptions-item>
           <el-descriptions-item v-else label="学费小计">
@@ -368,7 +443,7 @@
             <span v-else>-</span>
           </el-descriptions-item>
           <el-descriptions-item label="折扣后学费">
-            <span v-if="detailData.payment_type === 'semester'">¥{{ (detailData.semester_tuition_before_discount - detailData.sibling_discount_amount - detailData.teacher_discount_amount - detailData.alumni_discount_amount - detailData.scholarship_amount - detailData.company_discount_amount).toFixed(2) }}</span>
+            <span v-if="detailData.payment_type === 'semester_1' || detailData.payment_type === 'semester_2'">¥{{ (detailData.semester_tuition_before_discount - detailData.sibling_discount_amount - detailData.teacher_discount_amount - detailData.alumni_discount_amount - detailData.scholarship_amount - detailData.company_discount_amount).toFixed(2) }}</span>
             <span v-else>¥{{ (detailData.base_tuition - detailData.sibling_discount_amount - detailData.teacher_discount_amount - detailData.alumni_discount_amount - detailData.scholarship_amount - detailData.company_discount_amount).toFixed(2) }}</span>
           </el-descriptions-item>
         </el-descriptions>
@@ -396,11 +471,18 @@ export default {
       studentOptions: [],
       semesterOptions: [],
       currentSemesterConfig: null,  // 当前启用的学期配置
+      paymentTypeGroup: 'yearly',  // 用于界面显示的支付方式分组（yearly/semester）
       familyOptions: [],
       familyLoading: false,
       allFamilyOptions: [],
       selectedRows: [],
-      academicYearOptions: [],
+      academicYearOptions: ['2025-2026', '2024-2025', '2023-2024'],
+      // 支付方式配置常量
+      PAYMENT_TYPE_CONFIG: {
+        YEARLY: { value: 'yearly', label: '全年支付', group: 'yearly' },
+        SEMESTER_1: { value: 'semester_1', label: '第一学期', group: 'semester', semesterNum: 1 },
+        SEMESTER_2: { value: 'semester_2', label: '第二学期', group: 'semester', semesterNum: 2 }
+      },
       listQuery: {
         page: 1,
         page_size: 20,
@@ -417,6 +499,9 @@ export default {
       dialogTitle: '',
       isEdit: false,
       uploadAction: '/sljt/tuition/excel/',
+      importForm: {
+        academic_year: '2025-2026'
+      },
       tuitionForm: {
         id: null,
         student: null,
@@ -424,6 +509,12 @@ export default {
         academic_year: '2025-2026',
         is_teacher_child: false,
         payment_type: 'yearly',
+        tuition_period: '',
+        tuition_period_days: null,
+        start_date: null,
+        end_date: null,
+        semester: null,
+        registration_fee: null,
         discount_company: 0,
         discount_alumni: 0,
         discount_sibling: 0,
@@ -432,10 +523,23 @@ export default {
       detailData: null,
       detailSemesterId: null,
       detailStudentId: null,
+      editOriginData: null,  // 编辑时保存原始数据，用于对比变化
       rules: {
         student: [{ required: true, message: '请选择学生', trigger: 'change' }],
         invoice_no: [{ required: true, message: '请输入家庭编号', trigger: 'blur' }],
-        payment_type: [{ required: true, message: '请选择支付方式', trigger: 'change' }]
+        payment_type: [{ required: true, message: '请选择支付方式', trigger: 'change' }],
+        semester: [{ 
+          required: true, 
+          message: '请选择学期', 
+          trigger: 'change',
+          validator: (rule, value, callback) => {
+            if (this.paymentTypeGroup === 'semester' && !value) {
+              callback(new Error('学期支付时必须选择学期'))
+            } else {
+              callback()
+            }
+          }
+        }]
       }
     }
   },
@@ -643,10 +747,10 @@ export default {
     
     // 获取所有学费信息（用于过滤已有学费的学生）
     async getAllTuitionInfo() {
-      const allTuition = []
-      let page = 1
-      const pageSize = 100
-      let hasMore = true
+      // const allTuition = []
+      // let page = 1
+      // const pageSize = 100
+      // let hasMore = true
       
       try {
         while (hasMore) {
@@ -687,10 +791,10 @@ export default {
     
     // 获取所有学生（处理分页）
     async getAllStudents() {
-      const allStudents = []
-      let page = 1
-      const pageSize = 100
-      let hasMore = true
+      // const allStudents = []
+      // let page = 1
+      // const pageSize = 100
+      // let hasMore = true
       
       try {
         while (hasMore) {
@@ -775,6 +879,7 @@ export default {
         } else if (res.data) {
           results = Array.isArray(res.data) ? res.data : [res.data]
         }
+        console.log('学期选项数据:', results)
         this.semesterOptions = results
         
         // 找出当前学期配置（is_current=true）
@@ -849,6 +954,41 @@ export default {
       this.getList()
     },
     
+    // 处理日期变化，自动计算学费期间和天数
+    handleDateChange() {
+      const start = this.tuitionForm.start_date
+      const end = this.tuitionForm.end_date
+      
+      if (start && end) {
+        const startDate = new Date(start)
+        const endDate = new Date(end)
+        
+        // 验证开始日期不晚于结束日期
+        if (startDate > endDate) {
+          this.$message.warning('开始日期不能晚于结束日期')
+          return
+        }
+        
+        // 生成学费期间字符串格式：2025.08.18-2026.06.19
+        const formatDate = (date) => {
+          const year = date.getFullYear()
+          const month = String(date.getMonth() + 1).padStart(2, '0')
+          const day = String(date.getDate()).padStart(2, '0')
+          return `${year}.${month}.${day}`
+        }
+        
+        this.tuitionForm.tuition_period = `${formatDate(startDate)}-${formatDate(endDate)}`
+        
+        // 计算天数（包含起止日期）
+        const diffTime = Math.abs(endDate - startDate)
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
+        this.tuitionForm.tuition_period_days = diffDays
+      } else {
+        this.tuitionForm.tuition_period = ''
+        this.tuitionForm.tuition_period_days = null
+      }
+    },
+    
     handleSizeChange(val) {
       this.listQuery.page = 1
       this.listQuery.page_size = val
@@ -866,14 +1006,23 @@ export default {
     
     handleAdd() {
       this.isEdit = false
+      this.editOriginData = null
       this.dialogTitle = '新增学费信息'
+      const cfg = this.PAYMENT_TYPE_CONFIG
+      this.paymentTypeGroup = cfg.YEARLY.group
       this.tuitionForm = {
         id: null,
         student: null,
         invoice_no: '',
         academic_year: '2025-2026',
         is_teacher_child: false,
-        payment_type: 'yearly',
+        payment_type: cfg.YEARLY.value,
+        tuition_period: '',
+        tuition_period_days: null,
+        start_date: null,
+        end_date: null,
+        semester: null,
+        registration_fee: null,
         discount_company: 0,
         discount_alumni: 0,
         discount_sibling: 0,
@@ -885,9 +1034,78 @@ export default {
       })
     },
     
+    // 支付方式变化处理
+    handlePaymentTypeChange(val) {
+      const cfg = this.PAYMENT_TYPE_CONFIG
+      if (val === cfg.YEARLY.group) {
+        this.tuitionForm.semester = null
+        this.tuitionForm.payment_type = cfg.YEARLY.value
+      } else {
+        this.tuitionForm.payment_type = cfg.SEMESTER_1.value
+        this.updatePaymentTypeBySemester()
+      }
+    },
+    
+    // 根据选择的学期更新 payment_type
+    handleSemesterChange(semesterId) {
+      this.updatePaymentTypeBySemester()
+    },
+    
+    // 根据学期选项更新 payment_type
+    updatePaymentTypeBySemester() {
+      const cfg = this.PAYMENT_TYPE_CONFIG
+      const semesterId = this.tuitionForm.semester
+      if (!semesterId) return
+      
+      const selected = this.semesterOptions.find(item => item.id == semesterId)
+      if (!selected) return
+      
+      let num = selected.semester_number
+      if (num == null && selected.name) {
+        if (selected.name.includes('一') || selected.name.includes('1')) num = 1
+        else if (selected.name.includes('二') || selected.name.includes('2')) num = 2
+      }
+      
+      if (num == 1) this.tuitionForm.payment_type = cfg.SEMESTER_1.value
+      else if (num == 2) this.tuitionForm.payment_type = cfg.SEMESTER_2.value
+    },
+    
     handleEdit(row) {
       this.isEdit = true
       this.dialogTitle = '编辑学费信息'
+      // 解析学费期间，提取开始和结束日期
+      let startDate = null
+      let endDate = null
+      if (row.tuition_period && row.tuition_period.includes('-')) {
+        const parts = row.tuition_period.split('-')
+        if (parts.length === 2) {
+          // 将 2025.08.18 格式转换为 2025-08-18 格式
+          startDate = parts[0].replace(/\./g, '-')
+          endDate = parts[1].replace(/\./g, '-')
+        }
+      }
+      // 根据 payment_type 确定 paymentTypeGroup
+      const cfg = this.PAYMENT_TYPE_CONFIG
+      const isSemester = row.payment_type === cfg.SEMESTER_1.value || row.payment_type === cfg.SEMESTER_2.value
+      this.paymentTypeGroup = isSemester ? cfg.SEMESTER_1.group : cfg.YEARLY.group
+      
+      // 保存原始数据，用于对比变化
+      this.editOriginData = {
+        student: row.student,
+        invoice_no: row.invoice_no || '',
+        academic_year: row.academic_year || '2025-2026',
+        is_teacher_child: !!row.is_teacher_child,
+        payment_type: row.payment_type || 'yearly',
+        tuition_period: row.tuition_period || '',
+        tuition_period_days: row.tuition_period_days || null,
+        semester: row.semester || null,
+        registration_fee: row.registration_fee ? parseFloat(row.registration_fee) : null,
+        discount_company: parseFloat(row.discount_company) || 0,
+        discount_alumni: parseFloat(row.discount_alumni) || 0,
+        discount_sibling: parseFloat(row.discount_sibling) || 0,
+        scholarship_amount: parseFloat(row.scholarship_amount) || 0
+      }
+      
       this.tuitionForm = { 
         id: row.id,
         student: row.student,
@@ -895,6 +1113,12 @@ export default {
         academic_year: row.academic_year || '2025-2026',
         is_teacher_child: !!row.is_teacher_child,
         payment_type: row.payment_type || 'yearly',
+        tuition_period: row.tuition_period || '',
+        tuition_period_days: row.tuition_period_days || null,
+        start_date: startDate,
+        end_date: endDate,
+        semester: row.semester || null,
+        registration_fee: parseFloat(row.registration_fee) || null,
         discount_company: parseFloat(row.discount_company) || 0,
         discount_alumni: parseFloat(row.discount_alumni) || 0,
         discount_sibling: parseFloat(row.discount_sibling) || 0,
@@ -989,21 +1213,81 @@ export default {
       this.$refs.tuitionForm.validate(async(valid) => {
         if (valid) {
           try {
-            const submitData = {
-              ...this.tuitionForm,
-              scholarship_amount: parseFloat(this.tuitionForm.scholarship_amount) || 0
+            // 在提交前再次确保 payment_type 正确
+            if (this.paymentTypeGroup === 'semester' && this.tuitionForm.semester) {
+              this.updatePaymentTypeBySemester()
+            } else if (this.paymentTypeGroup === 'yearly') {
+              this.tuitionForm.payment_type = this.PAYMENT_TYPE_CONFIG.YEARLY.value
             }
             
+            const cfg = this.PAYMENT_TYPE_CONFIG
+            const form = this.tuitionForm
+            
+            // 计算 semester 值
+            let semesterValue = 0
+            if (form.payment_type === cfg.SEMESTER_1.value) semesterValue = 1
+            else if (form.payment_type === cfg.SEMESTER_2.value) semesterValue = 2
+            
+            // 构建完整提交数据
+            const fullData = {
+              student: form.student,
+              invoice_no: form.invoice_no,
+              academic_year: form.academic_year,
+              is_teacher_child: form.is_teacher_child,
+              payment_type: form.payment_type,
+              tuition_period: form.tuition_period,
+              tuition_period_days: form.tuition_period_days ? parseInt(form.tuition_period_days) : null,
+              semester: semesterValue,
+              registration_fee: form.registration_fee ? parseFloat(form.registration_fee) : null,
+              scholarship_amount: parseFloat(form.scholarship_amount) || 0,
+              discount_company: parseFloat(form.discount_company) || 0,
+              discount_alumni: parseFloat(form.discount_alumni) || 0,
+              discount_sibling: parseFloat(form.discount_sibling) || 0
+            }
+            
+            let submitData
+            
             if (this.isEdit) {
-              await this.$http.put(`/studenttuitioninfo/${this.tuitionForm.id}/`, submitData)
+              // 编辑模式：只提交变化的值
+              submitData = {}
+              const origin = this.editOriginData
+              
+              // 对比每个字段，只添加变化的值
+              for (const key in fullData) {
+                const newVal = fullData[key]
+                const oldVal = origin[key]
+                
+                // 处理数字精度问题（浮点数比较）
+                if (typeof newVal === 'number' && typeof oldVal === 'number') {
+                  if (Math.abs(newVal - oldVal) > 0.001) {
+                    submitData[key] = newVal
+                  }
+                } else if (newVal !== oldVal) {
+                  submitData[key] = newVal
+                }
+              }
+              
+              // 如果没有变化，提示用户
+              if (Object.keys(submitData).length === 0) {
+                this.$message.info('没有修改任何数据')
+                this.dialogVisible = false
+                return
+              }
+              
+              console.log('编辑提交（仅变化字段）:', submitData)
+              await this.$http.patch(`/studenttuitioninfo/${form.id}/`, submitData)
               this.$message.success('更新成功')
             } else {
+              // 新增模式：提交所有字段
+              submitData = fullData
+              console.log('新增提交:', submitData)
               await this.$http.post('/studenttuitioninfo/', submitData)
               this.$message.success('新增成功')
             }
             this.dialogVisible = false
             this.getList()
           } catch (error) {
+            console.error('提交失败:', error)
             this.$message.error(this.isEdit ? '更新失败' : '新增失败')
           }
         }
@@ -1037,6 +1321,12 @@ export default {
     },
     
     beforeUpload(file) {
+      // 验证是否选择了学年
+      if (!this.importForm.academic_year) {
+        this.$message.error('请先选择学年!')
+        return false
+      }
+      
       const isExcel = file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
                       file.type === 'application/vnd.ms-excel' ||
                       file.name.endsWith('.xlsx') || 
@@ -1056,9 +1346,29 @@ export default {
     
     handleUploadSuccess(response) {
       if (response.code === 1 || response.success) {
-        this.$message.success('导入成功')
-        this.importDialogVisible = false
-        this.getList()
+        const successCount = response.data?.success_count || response.success_count || 0
+        const failCount = response.data?.fail_count || response.fail_count || 0
+        const message = response.data?.message || response.message || '导入成功'
+        
+        this.$alert(
+          `<div style="text-align: center;">
+            <i class="el-icon-success" style="font-size: 48px; color: #67c23a; margin-bottom: 15px;"></i>
+            <div style="font-size: 16px; margin-bottom: 10px;">${message}</div>
+            <div style="color: #909399;">
+              成功导入: <span style="color: #67c23a; font-weight: bold;">${successCount}</span> 条记录
+              ${failCount > 0 ? `<br>失败: <span style="color: #f56c6c; font-weight: bold;">${failCount}</span> 条记录` : ''}
+            </div>
+          </div>`,
+          '导入完成',
+          {
+            confirmButtonText: '确定',
+            dangerouslyUseHTMLString: true,
+            callback: () => {
+              this.importDialogVisible = false
+              this.getList()
+            }
+          }
+        )
       } else {
         this.$message.error(response.message || '导入失败')
       }
@@ -1104,5 +1414,11 @@ export default {
 
 .discount-text {
   color: #67c23a;
+}
+
+.form-tip {
+  margin-left: 5px;
+  color: #909399;
+  font-size: 12px;
 }
 </style>
