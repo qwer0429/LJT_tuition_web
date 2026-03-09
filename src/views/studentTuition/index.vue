@@ -7,7 +7,7 @@
           <el-col :span="6">
             <el-form-item label="家庭编号：" style="width: 100%;">
               <el-select
-                v-model="listQuery.family_number"
+                v-model="listQuery.invoice_no"
                 placeholder="请选择或输入家庭编号"
                 clearable
                 filterable
@@ -18,8 +18,8 @@
                 @change="handleSearch"
               >
                 <el-option
-                  v-for="item in familyOptions"
-                  :key="item"
+                  v-for="(item, index) in familyOptions"
+                  :key="item + '-' + index"
                   :label="item"
                   :value="item"
                 />
@@ -39,14 +39,6 @@
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="6">
-            <el-form-item label="是否新生：" style="width: 100%;">
-              <el-select v-model="listQuery.is_new_student" placeholder="全部" clearable style="width: 100%;" @change="handleSearch">
-                <el-option label="是" :value="true" />
-                <el-option label="否" :value="false" />
-              </el-select>
-            </el-form-item>
-          </el-col>
         </el-row>
         <el-row :gutter="10">
           <el-col :span="6">
@@ -58,26 +50,9 @@
             </el-form-item>
           </el-col>
           <el-col :span="6">
-            <el-form-item label="校友折扣：" style="width: 100%;">
-              <el-select v-model="listQuery.is_alumni_sibling" placeholder="全部" clearable style="width: 100%;" @change="handleSearch">
-                <el-option label="是" :value="true" />
-                <el-option label="否" :value="false" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="6">
-            <el-form-item label="公司折扣：" style="width: 100%;">
-              <el-select v-model="listQuery.is_company_discount" placeholder="全部" clearable style="width: 100%;" @change="handleSearch">
-                <el-option label="是" :value="true" />
-                <el-option label="否" :value="false" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="6">
-            <el-form-item label="校车：" style="width: 100%;">
-              <el-select v-model="listQuery.needs_school_bus" placeholder="全部" clearable style="width: 100%;" @change="handleSearch">
-                <el-option label="需要" :value="true" />
-                <el-option label="不需要" :value="false" />
+            <el-form-item label="学年：" style="width: 100%;">
+              <el-select v-model="listQuery.academic_year" placeholder="全部" clearable style="width: 100%;" @change="handleSearch">
+                <el-option v-for="year in academicYearOptions" :key="year" :label="year" :value="year" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -133,25 +108,27 @@
           </template>
         </el-table-column>
         <el-table-column label="班级" prop="student_class_name" align="center" min-width="100" />
-        <el-table-column label="家庭编号" prop="family_number" align="center" min-width="120" />
-        <el-table-column label="是否新生" align="center" width="100">
+        <el-table-column label="家庭编号" prop="invoice_no" align="center" min-width="120" />
+        <el-table-column label="学年" prop="academic_year" align="center" width="100" />
+        <el-table-column label="学费期间" prop="tuition_period" align="center" min-width="180" />
+        <el-table-column label="学费期间天数" prop="tuition_period_days" align="center" width="100">
           <template slot-scope="scope">
-            <el-tag v-if="scope.row.is_new_student" type="success" size="small">是</el-tag>
-            <el-tag v-else type="info" size="small">否</el-tag>
+            <span v-if="scope.row.tuition_period_days">{{ scope.row.tuition_period_days }}天</span>
+            <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column label="支付方式" align="center" width="120">
+        <el-table-column label="支付方式" align="center" width="100">
           <template slot-scope="scope">
             <el-tag v-if="scope.row.payment_type === 'yearly'" type="primary" size="small">全年支付</el-tag>
             <el-tag v-else type="warning" size="small">学期支付</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="折扣类型" align="center" min-width="200">
+        <el-table-column label="折扣类型" align="center" min-width="150">
           <template slot-scope="scope">
             <el-tag v-if="scope.row.is_teacher_child" type="danger" size="small" class="discount-tag">教师子弟</el-tag>
-            <el-tag v-if="scope.row.is_alumni_sibling" type="success" size="small" class="discount-tag">校友</el-tag>
-            <el-tag v-if="scope.row.is_company_discount" type="warning" size="small" class="discount-tag">公司折扣</el-tag>
-            <span v-if="!scope.row.is_teacher_child && !scope.row.is_alumni_sibling && !scope.row.is_company_discount">-</span>
+            <el-tag v-if="scope.row.discount_company > 0" type="warning" size="small" class="discount-tag">公司折扣</el-tag>
+            <el-tag v-if="scope.row.discount_alumni > 0" type="success" size="small" class="discount-tag">校友</el-tag>
+            <span v-if="!scope.row.is_teacher_child && !(scope.row.discount_company > 0) && !(scope.row.discount_alumni > 0)">-</span>
           </template>
         </el-table-column>
         <el-table-column label="奖学金" prop="scholarship_amount" align="center" width="120">
@@ -160,12 +137,7 @@
             <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column label="校车" align="center" width="100">
-          <template slot-scope="scope">
-            <el-tag v-if="scope.row.needs_school_bus" type="success" size="small">需要</el-tag>
-            <el-tag v-else type="info" size="small">不需要</el-tag>
-          </template>
-        </el-table-column>
+
         <el-table-column label="邮件状态" align="center" width="120">
           <template slot-scope="scope">
             <el-tag v-if="scope.row.email_sent" type="success" size="small">已发送</el-tag>
@@ -220,15 +192,17 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="家庭编号" prop="family_number">
-              <el-input v-model="tuitionForm.family_number" placeholder="请输入家庭编号，如 F0001" />
+            <el-form-item label="家庭编号" prop="invoice_no">
+              <el-input v-model="tuitionForm.invoice_no" placeholder="请输入家庭编号，如 F0001" />
             </el-form-item>
           </el-col>
         </el-row>
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="是否新生" prop="is_new_student">
-              <el-switch v-model="tuitionForm.is_new_student" active-text="是" inactive-text="否" />
+            <el-form-item label="学年" prop="academic_year">
+              <el-select v-model="tuitionForm.academic_year" placeholder="请选择学年" style="width: 100%;">
+                <el-option v-for="year in academicYearOptions" :key="year" :label="year" :value="year" />
+              </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -248,13 +222,13 @@
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item label="校友兄弟姐妹">
-              <el-switch v-model="tuitionForm.is_alumni_sibling" />
+            <el-form-item label="校友折扣">
+              <el-input-number v-model="tuitionForm.discount_alumni" :min="0" :precision="2" style="width: 100%;" />
             </el-form-item>
           </el-col>
           <el-col :span="8">
             <el-form-item label="公司折扣">
-              <el-switch v-model="tuitionForm.is_company_discount" />
+              <el-input-number v-model="tuitionForm.discount_company" :min="0" :precision="2" style="width: 100%;" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -265,8 +239,8 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="是否需要校车">
-              <el-switch v-model="tuitionForm.needs_school_bus" />
+            <el-form-item label="学弟姐妹折扣">
+              <el-input-number v-model="tuitionForm.discount_sibling" :min="0" :precision="2" style="width: 100%;" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -328,22 +302,21 @@
         <!-- 学生基本信息 -->
         <el-descriptions :column="2" border title="学生信息">
           <el-descriptions-item label="学生">{{ detailData.student_name }}</el-descriptions-item>
-          <el-descriptions-item label="家庭编号">{{ detailData.family_number }}</el-descriptions-item>
+          <el-descriptions-item label="家庭编号">{{ detailData.invoice_no }}</el-descriptions-item>
           <el-descriptions-item label="年级">{{ detailData.grade }}</el-descriptions-item>
           <el-descriptions-item label="支付方式">
             <el-tag v-if="detailData.payment_type === 'yearly'" type="success">全年支付</el-tag>
             <el-tag v-else type="warning">学期支付</el-tag>
           </el-descriptions-item>
-          <el-descriptions-item v-if="detailData.is_new_student" label="入学日期" :span="2">{{ detailData.enrollment_date || '-' }}</el-descriptions-item>
         </el-descriptions>
         
         <!-- 学期信息（仅学期支付显示） -->
         <el-descriptions v-if="detailData.payment_type === 'semester'" :column="2" border title="学期信息" style="margin-top: 15px;">
           <el-descriptions-item label="学期">{{ detailData.semester_name || '当前学期' }}</el-descriptions-item>
-          <el-descriptions-item label="学期费率">{{ detailData.semester_rate }}%</el-descriptions-item>
+          <el-descriptions-item label="学期费率">{{ detailData.semester_rate > 0 ? detailData.semester_rate + '%' : '按天数计算' }}</el-descriptions-item>
           <el-descriptions-item label="学期总工作日">{{ detailData.semester_days }}天</el-descriptions-item>
-          <el-descriptions-item label="入学后工作日">{{ detailData.student_working_days }}天</el-descriptions-item>
-          <el-descriptions-item label="入学日期" :span="2">{{ detailData.enrollment_date || '-' }}</el-descriptions-item>
+          <el-descriptions-item v-if="detailData.tuition_period_days" label="学费期间天数">{{ detailData.tuition_period_days }}天</el-descriptions-item>
+          <el-descriptions-item v-else label="入学后工作日">{{ detailData.student_working_days }}天</el-descriptions-item>
         </el-descriptions>
         
         <!-- 费用明细 -->
@@ -427,17 +400,15 @@ export default {
       familyLoading: false,
       allFamilyOptions: [],
       selectedRows: [],
+      academicYearOptions: [],
       listQuery: {
         page: 1,
         page_size: 20,
-        family_number: '',
+        invoice_no: '',
         search: '',
         payment_type: '',
-        is_new_student: '',
+        academic_year: '',
         is_teacher_child: '',
-        is_alumni_sibling: '',
-        is_company_discount: '',
-        needs_school_bus: '',
         email_sent: ''
       },
       dialogVisible: false,
@@ -449,13 +420,13 @@ export default {
       tuitionForm: {
         id: null,
         student: null,
-        family_number: '',
-        is_new_student: true,
+        invoice_no: '',
+        academic_year: '2025-2026',
         is_teacher_child: false,
-        is_alumni_sibling: false,
-        needs_school_bus: false,
         payment_type: 'yearly',
-        is_company_discount: false,
+        discount_company: 0,
+        discount_alumni: 0,
+        discount_sibling: 0,
         scholarship_amount: 0
       },
       detailData: null,
@@ -463,7 +434,7 @@ export default {
       detailStudentId: null,
       rules: {
         student: [{ required: true, message: '请选择学生', trigger: 'change' }],
-        family_number: [{ required: true, message: '请输入家庭编号', trigger: 'blur' }],
+        invoice_no: [{ required: true, message: '请输入家庭编号', trigger: 'blur' }],
         payment_type: [{ required: true, message: '请选择支付方式', trigger: 'change' }]
       }
     }
@@ -491,6 +462,9 @@ export default {
         this.getSemesterOptions()
       ])
       
+      // 从已加载的数据中提取学年列表
+      this.extractAcademicYears()
+      
       // 学生选项需要等列表加载完成后再加载（用于新增时过滤）
       this.getStudentOptions()
       
@@ -505,6 +479,19 @@ export default {
       this.listQuery.page = 1
       await this.initPageData()
       this.$message.success('数据已刷新')
+    },
+    
+    // 从列表数据中提取学年列表（去重并排序）
+    extractAcademicYears() {
+      const years = new Set()
+      this.list.forEach(item => {
+        if (item.academic_year) {
+          years.add(item.academic_year)
+        }
+      })
+      // 转为数组并按降序排序
+      this.academicYearOptions = Array.from(years).sort().reverse()
+      console.log('提取的学年列表:', this.academicYearOptions)
     },
     
     // 计算表格最大高度，避免双滚动条
@@ -534,8 +521,8 @@ export default {
       }
       
       // 添加筛选条件
-      if (this.listQuery.family_number) {
-        params.family_number = this.listQuery.family_number
+      if (this.listQuery.invoice_no) {
+        params.invoice_no = this.listQuery.invoice_no
       }
       if (this.listQuery.search) {
         params.search = this.listQuery.search
@@ -543,20 +530,11 @@ export default {
       if (this.listQuery.payment_type) {
         params.payment_type = this.listQuery.payment_type
       }
-      if (this.listQuery.is_new_student !== '') {
-        params.is_new_student = this.listQuery.is_new_student
+      if (this.listQuery.academic_year) {
+        params.academic_year = this.listQuery.academic_year
       }
       if (this.listQuery.is_teacher_child !== '') {
         params.is_teacher_child = this.listQuery.is_teacher_child
-      }
-      if (this.listQuery.is_alumni_sibling !== '') {
-        params.is_alumni_sibling = this.listQuery.is_alumni_sibling
-      }
-      if (this.listQuery.is_company_discount !== '') {
-        params.is_company_discount = this.listQuery.is_company_discount
-      }
-      if (this.listQuery.needs_school_bus !== '') {
-        params.needs_school_bus = this.listQuery.needs_school_bus
       }
       if (this.listQuery.email_sent !== '') {
         params.email_sent = this.listQuery.email_sent
@@ -639,13 +617,12 @@ export default {
         
         this.list = dataList.map(item => ({
           ...item,
-          is_new_student: !!item.is_new_student,
           is_teacher_child: !!item.is_teacher_child,
-          is_alumni_sibling: !!item.is_alumni_sibling,
-          is_company_discount: !!item.is_company_discount,
-          needs_school_bus: !!item.needs_school_bus,
           email_sent: !!item.email_sent,
-          scholarship_amount: parseFloat(item.scholarship_amount) || 0
+          scholarship_amount: parseFloat(item.scholarship_amount) || 0,
+          discount_company: parseFloat(item.discount_company) || 0,
+          discount_alumni: parseFloat(item.discount_alumni) || 0,
+          discount_sibling: parseFloat(item.discount_sibling) || 0
         }))
         
         // 使用后端返回的总数
@@ -862,14 +839,11 @@ export default {
       this.listQuery = {
         page: 1,
         page_size: 20,
-        family_number: '',
+        invoice_no: '',
         search: '',
         payment_type: '',
-        is_new_student: '',
+        academic_year: '',
         is_teacher_child: '',
-        is_alumni_sibling: '',
-        is_company_discount: '',
-        needs_school_bus: '',
         email_sent: ''
       }
       this.getList()
@@ -896,13 +870,13 @@ export default {
       this.tuitionForm = {
         id: null,
         student: null,
-        family_number: '',
-        is_new_student: true,
+        invoice_no: '',
+        academic_year: '2025-2026',
         is_teacher_child: false,
-        is_alumni_sibling: false,
-        needs_school_bus: false,
         payment_type: 'yearly',
-        is_company_discount: false,
+        discount_company: 0,
+        discount_alumni: 0,
+        discount_sibling: 0,
         scholarship_amount: 0
       }
       this.dialogVisible = true
@@ -917,13 +891,13 @@ export default {
       this.tuitionForm = { 
         id: row.id,
         student: row.student,
-        family_number: row.family_number || '',
-        is_new_student: !!row.is_new_student,
+        invoice_no: row.invoice_no || '',
+        academic_year: row.academic_year || '2025-2026',
         is_teacher_child: !!row.is_teacher_child,
-        is_alumni_sibling: !!row.is_alumni_sibling,
-        needs_school_bus: !!row.needs_school_bus,
         payment_type: row.payment_type || 'yearly',
-        is_company_discount: !!row.is_company_discount,
+        discount_company: parseFloat(row.discount_company) || 0,
+        discount_alumni: parseFloat(row.discount_alumni) || 0,
+        discount_sibling: parseFloat(row.discount_sibling) || 0,
         scholarship_amount: parseFloat(row.scholarship_amount) || 0
       }
       this.dialogVisible = true
@@ -962,13 +936,13 @@ export default {
         // 获取当前行数据补充学生信息
         const row = this.list.find(item => item.student_id === this.detailStudentId) || {}
         
-        // 后端返回的数据格式: { student_id, family_number, child_order, tuition_detail }
+        // 后端返回的数据格式: { student_id, invoice_no, child_order, tuition_detail }
         const tuitionDetail = res.data.tuition_detail || res.data
         
         this.detailData = {
           ...tuitionDetail,
           student_id: res.data.student_id || this.detailStudentId,
-          family_number: res.data.family_number || row.family_number,
+          invoice_no: res.data.invoice_no || row.invoice_no,
           child_order: res.data.child_order,
           student_name: tuitionDetail.student_name || row.student_name,
           grade: tuitionDetail.grade || row.student_class_name
@@ -1042,10 +1016,10 @@ export default {
         return
       }
       try {
-        const familyNumbers = [...new Set(this.selectedRows.map(row => row.family_number))]
+        const invoiceNos = [...new Set(this.selectedRows.map(row => row.invoice_no))]
         await this.$http.post('/tuition/email/', {
           action: 'send_batch',
-          family_numbers: familyNumbers
+          invoice_nos: invoiceNos
         })
         this.$message.success('邮件发送成功')
         this.getList()

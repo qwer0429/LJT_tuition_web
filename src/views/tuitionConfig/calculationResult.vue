@@ -57,11 +57,11 @@
           <el-select v-model="selectedFamily" placeholder="请选择家庭" clearable filterable style="width: 200px;">
             <el-option
               v-for="item in filteredFamilyOptions"
-              :key="item.family_number || item"
-              :label="item.family_number || item"
-              :value="item.family_number || item"
+              :key="item.invoice_no || item"
+              :label="item.invoice_no || item"
+              :value="item.invoice_no || item"
             >
-              <span style="float: left">{{ item.family_number || item }}</span>
+              <span style="float: left">{{ item.invoice_no || item }}</span>
               <span v-if="item.payment_type" style="float: right; color: #8492a6; font-size: 13px">
                 <el-tag v-if="item.payment_type === 'all_yearly'" type="success" size="mini">全年</el-tag>
                 <el-tag v-else-if="item.payment_type === 'all_semester'" type="warning" size="mini">学期</el-tag>
@@ -102,7 +102,7 @@
               <div style="width: 100%; display: flex; justify-content: space-between; padding-right: 20px;">
                 <span>
                   <i class="el-icon-house" style="margin-right: 10px;" />
-                  家庭：{{ family.family_number }}
+                  家庭：{{ family.invoice_no }}
                   <el-tag size="small" style="margin-left: 10px;">{{ family.student_count }}名学生</el-tag>
                 </span>
                 <span class="amount-text">¥{{ family.final_total }}</span>
@@ -190,9 +190,9 @@
         </el-collapse>
       </div>
 
-      <div v-else-if="calculationResult.family_number">
+      <div v-else-if="calculationResult.invoice_no">
         <el-descriptions :column="3" border style="margin-bottom: 20px;">
-          <el-descriptions-item label="家庭编号">{{ calculationResult.family_number }}</el-descriptions-item>
+          <el-descriptions-item label="家庭编号">{{ calculationResult.invoice_no }}</el-descriptions-item>
           <el-descriptions-item label="学生数量">{{ calculationResult.student_count }}</el-descriptions-item>
           <el-descriptions-item label="应付总额">
             <span class="amount-text" style="font-size: 16px;">¥{{ calculationResult.final_total }}</span>
@@ -331,70 +331,24 @@ export default {
       this.$message.success('数据已刷新')
     },
     
-    // 获取所有学费信息中的家庭编号
+    // 获取所有学费信息中的家庭编号（已废弃，保留方法避免引用错误）
     async getExistingFamilyNumbers() {
-      const allTuition = []
-      let page = 1
-      const pageSize = 100
-      let hasMore = true
-      
-      try {
-        while (hasMore) {
-          const res = await this.$http.get('/studenttuitioninfo/', { 
-            params: { page: page, page_size: pageSize } 
-          })
-          
-          let dataList = []
-          if (Array.isArray(res)) {
-            dataList = res
-            hasMore = false
-          } else if (res.results && Array.isArray(res.results)) {
-            dataList = res.results
-            hasMore = dataList.length === pageSize && (res.count > allTuition.length + dataList.length)
-          } else if (res.data && Array.isArray(res.data)) {
-            dataList = res.data
-            hasMore = false
-          }
-          
-          allTuition.push(...dataList)
-          
-          if (dataList.length < pageSize) {
-            hasMore = false
-          }
-          page++
-          
-          if (allTuition.length > 10000) break
-        }
-      } catch (error) {
-        console.error('获取学费信息失败:', error)
-      }
-      
-      const familyNumbers = [...new Set(allTuition.map(item => item.family_number).filter(fn => fn))]
-      console.log('已有学费信息的家庭编号:', familyNumbers)
-      return new Set(familyNumbers)
+      // 不再从 studenttuitioninfo 获取数据进行去重
+      // 直接返回空集合，不再过滤家庭列表
+      return new Set()
     },
     
     async getFamilyOptions() {
       try {
-        const existingFamilies = await this.getExistingFamilyNumbers()
-        console.log('学费信息中的家庭编号:', [...existingFamilies])
-        
         const res = await this.$http.get('/tuition/calculate/', { params: { type: 'families' }})
         let allFamilies = res.data || []
         console.log('后端返回的所有家庭:', allFamilies)
         
-        // 取交集：既有学费信息，又存在于后端家庭列表中的家庭
-        const validFamilies = allFamilies.filter(family => {
-          const familyNumber = typeof family === 'string' ? family : family.family_number
-          const hasTuition = existingFamilies.has(familyNumber)
-          console.log(`家庭 ${familyNumber}: 在后端列表中, 有学费信息: ${hasTuition}`)
-          return hasTuition
-        })
+        // 直接使用后端返回的家庭列表（已去重）
+        this.familyOptions = allFamilies
+        console.log('有效家庭数量:', allFamilies.length)
         
-        this.familyOptions = validFamilies
-        console.log('有效家庭数量:', validFamilies.length)
-        
-        if (validFamilies.length === 0) {
+        if (allFamilies.length === 0) {
           this.$message.warning('没有可计算的家庭，请先在学生学费信息管理中维护家庭数据')
         }
       } catch (error) {
@@ -405,20 +359,14 @@ export default {
     
     async getFamilyPaymentTypes() {
       try {
-        const existingFamilies = await this.getExistingFamilyNumbers()
-        
         const res = await this.$http.get('/tuition/calculate/', { params: { type: 'family_payment_types' }})
         
         if (res.data && res.data.families) {
-          // 只显示有学费信息的家庭
-          const filterFamilies = (families) => {
-            return families.filter(family => existingFamilies.has(family.family_number))
-          }
-          
+          // 直接使用后端返回的家庭列表，不再根据学费信息过滤
           this.familyPaymentOptions = {
-            all_yearly: filterFamilies(res.data.families.all_yearly || []),
-            all_semester: filterFamilies(res.data.families.all_semester || []),
-            mixed: filterFamilies(res.data.families.mixed || [])
+            all_yearly: res.data.families.all_yearly || [],
+            all_semester: res.data.families.all_semester || [],
+            mixed: res.data.families.mixed || []
           }
           
           this.familyPaymentStats = {
@@ -524,7 +472,7 @@ export default {
       try {
         const params = {
           action: 'calculate_family',
-          family_number: this.selectedFamily,
+          invoice_no: this.selectedFamily,
           academic_year: this.calcForm.academic_year
         }
         
@@ -562,7 +510,7 @@ export default {
       try {
         await this.$http.post('/tuition/email/', {
           action: 'send_single',
-          family_number: family.family_number
+          invoice_no: family.invoice_no
         })
         this.$message.success('邮件发送成功')
       } catch (error) {
@@ -583,7 +531,7 @@ export default {
       try {
         const res = await this.$http.post('/tuition/email/', {
           action: 'preview_pdf',
-          family_number: family.family_number
+          invoice_no: family.invoice_no
         }, { responseType: 'blob' })
         this.pdfUrl = URL.createObjectURL(res)
         this.pdfDialogVisible = true

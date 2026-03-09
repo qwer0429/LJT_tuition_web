@@ -24,7 +24,7 @@ module.exports = {
     },
     proxy: {
       '/sljt': {
-        target: 'http://192.168.150.129:9000',
+        target: 'http://localhost:8000',
         changeOrigin: true,
         pathRewrite: {
           '^/sljt': '/sljt'

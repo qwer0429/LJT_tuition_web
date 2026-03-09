@@ -20,6 +20,7 @@
         style="width: 100%;"
         :max-height="tableHeight"
       >
+        <el-table-column label="学年" prop="academic_year" align="center" min-width="120" />
         <el-table-column label="年级名称" prop="grade_name" align="center" min-width="120" />
         <el-table-column label="年级代码" prop="grade_code" align="center" min-width="120" />
         <el-table-column label="基础学费" prop="base_tuition" align="center" min-width="150">
@@ -56,6 +57,9 @@
     <!-- 编辑/新增对话框 -->
     <el-dialog :title="dialogTitle" :visible.sync="dialogVisible" width="600px">
       <el-form ref="gradeForm" :model="gradeForm" :rules="rules" label-width="120px">
+        <el-form-item label="学年" prop="academic_year">
+          <el-input v-model="gradeForm.academic_year" placeholder="如：2025-2026" />
+        </el-form-item>
         <el-form-item label="年级名称" prop="grade_name">
           <el-input v-model="gradeForm.grade_name" placeholder="如：PYP5" />
         </el-form-item>
@@ -96,6 +100,7 @@ export default {
       isEdit: false,
       gradeForm: {
         id: null,
+        academic_year: '',
         grade_name: '',
         grade_code: '',
         base_tuition: 165000,
@@ -104,6 +109,7 @@ export default {
         is_active: true
       },
       rules: {
+        academic_year: [{ required: true, message: '请输入学年', trigger: 'blur' }],
         grade_name: [{ required: true, message: '请输入年级名称', trigger: 'blur' }],
         grade_code: [{ required: true, message: '请输入年级代码', trigger: 'blur' }],
         base_tuition: [{ required: true, message: '请输入基础学费', trigger: 'blur' }],
@@ -178,6 +184,7 @@ export default {
       this.dialogTitle = '新增年级配置'
       this.gradeForm = {
         id: null,
+        academic_year: '',
         grade_name: '',
         grade_code: '',
         base_tuition: 165000,
@@ -197,6 +204,7 @@ export default {
       this.dialogTitle = '编辑年级配置'
       this.gradeForm = { 
         id: row.id,
+        academic_year: row.academic_year || '',
         grade_name: row.grade_name || '',
         grade_code: row.grade_code || '',
         base_tuition: parseFloat(row.base_tuition) || 0,
