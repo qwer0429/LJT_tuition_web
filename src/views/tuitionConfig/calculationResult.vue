@@ -254,9 +254,19 @@
     </el-card>
 
     <!-- PDF预览对话框 -->
-    <el-dialog title="学费通知单预览" :visible.sync="pdfDialogVisible" width="800px">
+    <el-dialog title="学费通知单预览" :visible.sync="pdfDialogVisible" width="800px" @close="handlePdfDialogClose">
       <div v-if="pdfUrl" style="text-align: center;">
-        <iframe :src="pdfUrl" width="100%" height="600px" style="border: none;"></iframe>
+        <iframe 
+          :src="pdfUrl" 
+          width="100%" 
+          height="600px" 
+          style="border: none;"
+          @load="handlePdfLoad"
+        ></iframe>
+      </div>
+      <div v-else style="text-align: center; padding: 50px;">
+        <i class="el-icon-loading" style="font-size: 24px;"></i>
+        <p>正在加载PDF...</p>
       </div>
     </el-dialog>
   </div>
@@ -533,14 +543,26 @@ export default {
           action: 'preview_pdf',
           invoice_no: family.invoice_no
         }, { responseType: 'blob' })
-        this.pdfUrl = URL.createObjectURL(res)
+        // http拦截器返回的是整个response对象，需要取data
+        const blob = res.data || res
+        this.pdfUrl = URL.createObjectURL(blob)
         this.pdfDialogVisible = true
       } catch (error) {
-        this.$message.error('PDF预览失败')
+        this.$message.error('PDF预览失败: ' + (error.message || '未知错误'))
       }
     },
     handleExportResult() {
       this.$message.info('导出功能开发中...')
+    },
+    handlePdfDialogClose() {
+      // 释放 blob URL，防止内存泄漏
+      if (this.pdfUrl && this.pdfUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(this.pdfUrl)
+        this.pdfUrl = ''
+      }
+    },
+    handlePdfLoad() {
+      console.log('PDF加载成功')
     }
   }
 }
