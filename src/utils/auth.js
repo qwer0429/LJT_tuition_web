@@ -7,9 +7,10 @@ export function getToken() {
 }
 
 export function setToken(token) {
-  return Cookies.set(TokenKey, token)
+  // 设置 cookie，path 为根路径，确保所有页面都能访问
+  return Cookies.set(TokenKey, token, { path: '/' })
 }
 
 export function removeToken() {
-  return Cookies.remove(TokenKey)
+  return Cookies.remove(TokenKey, { path: '/' })
 }

@@ -5,7 +5,7 @@
     <div class="right-menu">
       <el-dropdown class="avatar-container" trigger="click">
         <div class="avatar-wrapper">
-          <span class="user-name">管理员</span>
+          <span class="user-name">{{ name || '用户' }}</span>
           <i class="el-icon-caret-bottom" />
         </div>
         <el-dropdown-menu slot="dropdown" class="user-dropdown">
@@ -31,7 +31,8 @@ export default {
   computed: {
     ...mapGetters([
       'sidebar',
-      'avatar'
+      'avatar',
+      'name'
     ])
   },
   methods: {
@@ -39,8 +40,21 @@ export default {
       this.$store.dispatch('app/toggleSideBar')
     },
     async logout() {
-      await this.$store.dispatch('user/resetToken')
-      this.$router.push(`/login?redirect=${this.$route.fullPath}`)
+      try {
+        await this.$confirm('确定要退出登录吗？', '提示', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        })
+        await this.$store.dispatch('user/logout')
+        this.$message.success('已退出登录')
+        this.$router.push('/login')
+      } catch (error) {
+        // 用户取消或请求失败
+        if (error !== 'cancel') {
+          console.error('登出失败:', error)
+        }
+      }
     }
   }
 }

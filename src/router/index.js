@@ -63,7 +63,7 @@ export const constantRoutes = [
         path: 'calculation',
         name: 'CalculationConfig',
         component: () => import('@/views/tuitionConfig/calculation'),
-        meta: { title: '计算规则配置' }
+        meta: { title: '校历' }
       }
     ]
   },

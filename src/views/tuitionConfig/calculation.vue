@@ -49,52 +49,7 @@
           </el-col>
         </el-row>
 
-        <el-divider content-position="left">学期支付比例</el-divider>
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="老生学期支付比例(%)">
-              <el-input-number v-model="configForm.semester_rate_returning" :min="0" :max="100" :precision="2" style="width: 100%;" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="新生学期支付比例(%)">
-              <el-input-number v-model="configForm.semester_rate_new" :min="0" :max="200" :precision="2" style="width: 100%;" />
-            </el-form-item>
-          </el-col>
-        </el-row>
 
-        <el-divider content-position="left">兄弟姐妹折扣</el-divider>
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="第二个孩子折扣(%)">
-              <el-input-number v-model="configForm.sibling_discount_2nd" :min="0" :max="100" :precision="2" style="width: 100%;" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="第三个及以后折扣(%)">
-              <el-input-number v-model="configForm.sibling_discount_3rd" :min="0" :max="100" :precision="2" style="width: 100%;" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-
-        <el-divider content-position="left">其他折扣</el-divider>
-        <el-row :gutter="20">
-          <el-col :span="8">
-            <el-form-item label="公司折扣(%)">
-              <el-input-number v-model="configForm.company_discount_rate" :min="0" :max="100" :precision="2" style="width: 100%;" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="校友兄弟姐妹折扣(%)">
-              <el-input-number v-model="configForm.alumni_discount_rate" :min="0" :max="100" :precision="2" style="width: 100%;" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="教师子弟折扣(%)">
-              <el-input-number v-model="configForm.teacher_discount_rate" :min="0" :max="100" :precision="2" style="width: 100%;" />
-            </el-form-item>
-          </el-col>
-        </el-row>
 
         <el-divider content-position="left">校车费用</el-divider>
         <el-row :gutter="20">

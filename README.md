@@ -12,7 +12,7 @@
 - **学生学费信息**：管理学生的折扣类型、支付方式、奖学金等
 - **学费配置**：
   - 年级学费配置：不同年级的基础学费设置
-  - 计算规则配置：折扣比例、校车费用、时间配置
+  - 校历：学期时间配置
 - **学费计算**：按家庭计算学费，支持全年/学期两种支付方式
 
 ## 技术栈
@@ -42,7 +42,7 @@ src/
 │   ├── studentTuition/   # 学生学费信息
 │   └── tuitionConfig/    # 学费配置
 │       ├── grade.vue         # 年级配置
-│       ├── calculation.vue   # 计算规则
+│       ├── calculation.vue   # 校历
 │       └── calculationResult.vue  # 学费计算
 ├── App.vue
 └── main.js
@@ -76,7 +76,7 @@ npm run build:prod
 - `/sljt/students/` - 学生管理
 - `/sljt/studenttuitioninfo/` - 学生学费信息
 - `/sljt/gradetuitionconfig/` - 年级学费配置
-- `/sljt/tuitioncalculationconfig/` - 计算规则配置
+- `/sljt/tuitioncalculationconfig/` - 校历配置
 - `/sljt/tuition/calculate/` - 学费计算
 - `/sljt/tuition/email/` - 邮件发送
 

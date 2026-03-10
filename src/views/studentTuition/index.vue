@@ -126,20 +126,14 @@
             <el-tag v-else type="info" size="small">{{ scope.row.payment_type }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="折扣类型" align="center" min-width="200">
+        <el-table-column label="折扣类型" align="center" min-width="220">
           <template slot-scope="scope">
             <el-tag v-if="scope.row.is_teacher_child" type="danger" size="small" class="discount-tag">教师子弟</el-tag>
             <el-tag v-if="scope.row.discount_sibling > 0" type="primary" size="small" class="discount-tag">兄弟姐妹</el-tag>
             <el-tag v-if="scope.row.discount_company > 0" type="warning" size="small" class="discount-tag">公司折扣</el-tag>
             <el-tag v-if="scope.row.discount_alumni > 0" type="success" size="small" class="discount-tag">校友</el-tag>
-            <el-tag v-if="scope.row.scholarship_amount > 0" type="info" size="small" class="discount-tag">奖学金</el-tag>
+            <el-tag v-if="scope.row.scholarship_amount > 0" type="info" size="small" class="discount-tag">奖学金 ¥{{ scope.row.scholarship_amount }}</el-tag>
             <span v-if="!scope.row.is_teacher_child && !(scope.row.discount_sibling > 0) && !(scope.row.discount_company > 0) && !(scope.row.discount_alumni > 0) && !(scope.row.scholarship_amount > 0)">-</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="奖学金" prop="scholarship_amount" align="center" width="120">
-          <template slot-scope="scope">
-            <span v-if="scope.row.scholarship_amount > 0" class="amount-text">¥{{ scope.row.scholarship_amount }}</span>
-            <span v-else>-</span>
           </template>
         </el-table-column>
 
@@ -747,10 +741,10 @@ export default {
     
     // 获取所有学费信息（用于过滤已有学费的学生）
     async getAllTuitionInfo() {
-      // const allTuition = []
-      // let page = 1
-      // const pageSize = 100
-      // let hasMore = true
+      const allTuition = []
+      let page = 1
+      const pageSize = 100
+      let hasMore = true
       
       try {
         while (hasMore) {
@@ -791,10 +785,10 @@ export default {
     
     // 获取所有学生（处理分页）
     async getAllStudents() {
-      // const allStudents = []
-      // let page = 1
-      // const pageSize = 100
-      // let hasMore = true
+      const allStudents = []
+      let page = 1
+      const pageSize = 100
+      let hasMore = true
       
       try {
         while (hasMore) {
@@ -904,9 +898,19 @@ export default {
     async getFamilyOptions() {
       try {
         const res = await this.$http.get('/tuition/calculate/', { params: { type: 'families' }})
+        console.log('家庭编号接口返回:', res)
         let dataList = []
         if (Array.isArray(res)) {
           dataList = res
+        } else if (res.code === 1 && res.data && res.data.families) {
+          // 处理 {code: 1, data: {families: [...]}} 格式
+          const families = res.data.families
+          if (Array.isArray(families)) {
+            dataList = families
+          } else if (typeof families === 'object') {
+            // 可能是 {all_yearly: [...], all_semester: [...], mixed: [...]} 格式
+            dataList = [...(families.all_yearly || []), ...(families.all_semester || []), ...(families.mixed || [])]
+          }
         } else if (res.data && Array.isArray(res.data)) {
           dataList = res.data
         } else if (res.results && Array.isArray(res.results)) {
@@ -914,6 +918,7 @@ export default {
         }
         this.allFamilyOptions = dataList
         this.familyOptions = dataList
+        console.log('家庭编号列表:', dataList)
       } catch (error) {
         console.error('获取家庭编号列表失败:', error)
         this.allFamilyOptions = []
