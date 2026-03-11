@@ -83,7 +83,7 @@
         <el-button type="primary" icon="el-icon-plus" @click="handleAdd">新增学费信息</el-button>
         <el-button type="success" icon="el-icon-upload2" @click="handleImport">批量导入</el-button>
         <el-button type="success" icon="el-icon-message" @click="handleBatchEmail">批量发送邮件</el-button>
-        <el-button icon="el-icon-refresh" @click="refreshCache">刷新缓存</el-button>
+        <el-button icon="el-icon-refresh" @click="refreshCache">刷新</el-button>
       </div>
     </el-card>
 
@@ -108,7 +108,7 @@
             <div style="color: #c0c4cc; font-size: 12px;">学号: {{ scope.row.student_no }}</div>
           </template>
         </el-table-column>
-        <el-table-column label="班级" prop="student_class_name" align="center" min-width="100" />
+        <el-table-column label="年级" prop="grade" align="center" min-width="100" />
         <el-table-column label="家庭编号" prop="invoice_no" align="center" min-width="120" />
         <el-table-column label="学年" prop="academic_year" align="center" width="100" />
         <el-table-column label="学费期间" prop="tuition_period" align="center" min-width="180" />
@@ -133,7 +133,8 @@
             <el-tag v-if="scope.row.discount_company > 0" type="warning" size="small" class="discount-tag">公司折扣</el-tag>
             <el-tag v-if="scope.row.discount_alumni > 0" type="success" size="small" class="discount-tag">校友</el-tag>
             <el-tag v-if="scope.row.scholarship_amount > 0" type="info" size="small" class="discount-tag">奖学金 ¥{{ scope.row.scholarship_amount }}</el-tag>
-            <span v-if="!scope.row.is_teacher_child && !(scope.row.discount_sibling > 0) && !(scope.row.discount_company > 0) && !(scope.row.discount_alumni > 0) && !(scope.row.scholarship_amount > 0)">-</span>
+            <el-tag v-if="scope.row.scholarship_discount_rate > 0" type="info" size="small" class="discount-tag">奖学金比例 {{ scope.row.scholarship_discount_rate }}%</el-tag>
+            <span v-if="!scope.row.is_teacher_child && !(scope.row.discount_sibling > 0) && !(scope.row.discount_company > 0) && !(scope.row.discount_alumni > 0) && !(scope.row.scholarship_amount > 0) && !(scope.row.scholarship_discount_rate > 0)">-</span>
           </template>
         </el-table-column>
 
@@ -298,6 +299,13 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
+            <el-form-item label="奖学金比例(%)">
+              <el-input-number v-model="tuitionForm.scholarship_discount_rate" :min="0" :max="100" :precision="2" :controls="true" controls-position="right" style="width: 100%;" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
             <el-form-item label="学弟姐妹折扣">
               <el-input-number v-model="tuitionForm.discount_sibling" :min="0" :precision="2" :controls="true" controls-position="right" style="width: 100%;" />
             </el-form-item>
@@ -327,6 +335,7 @@
         :data="importForm"
         :on-success="handleUploadSuccess"
         :on-error="handleUploadError"
+        :on-progress="handleUploadProgress"
         :before-upload="beforeUpload"
         accept=".xlsx,.xls"
         :auto-upload="true"
@@ -365,7 +374,7 @@
             <el-button type="primary" size="small" @click="recalculateDetail">重新计算</el-button>
           </el-form-item>
         </el-form>
-        
+
         <!-- 学生基本信息 -->
         <el-descriptions :column="2" border title="学生信息">
           <el-descriptions-item label="学生">{{ detailData.student_name }}</el-descriptions-item>
@@ -378,7 +387,7 @@
             <el-tag v-else type="info">{{ detailData.payment_type }}</el-tag>
           </el-descriptions-item>
         </el-descriptions>
-        
+
         <!-- 学期信息（仅学期支付显示） -->
         <el-descriptions v-if="detailData.payment_type === 'semester_1' || detailData.payment_type === 'semester_2'" :column="2" border title="学期信息" style="margin-top: 15px;">
           <el-descriptions-item label="学期">{{ detailData.semester_name || '当前学期' }}</el-descriptions-item>
@@ -387,7 +396,7 @@
           <el-descriptions-item v-if="detailData.tuition_period_days" label="学费期间天数">{{ detailData.tuition_period_days }}天</el-descriptions-item>
           <el-descriptions-item v-else label="入学后工作日">{{ detailData.student_working_days }}天</el-descriptions-item>
         </el-descriptions>
-        
+
         <!-- 费用明细 -->
         <el-descriptions :column="2" border title="费用明细" style="margin-top: 15px;">
           <el-descriptions-item label="基础学费">
@@ -403,7 +412,7 @@
             <span>¥{{ detailData.base_tuition }}</span>
           </el-descriptions-item>
         </el-descriptions>
-        
+
         <!-- 折扣明细 -->
         <el-descriptions :column="2" border title="折扣明细" style="margin-top: 15px;">
           <el-descriptions-item label="兄弟姐妹折扣">
@@ -436,12 +445,18 @@
             </span>
             <span v-else>-</span>
           </el-descriptions-item>
+          <el-descriptions-item label="奖学金比例">
+            <span v-if="detailData.scholarship_discount_rate > 0" class="discount-text">
+              {{ detailData.scholarship_discount_rate }}%
+            </span>
+            <span v-else>-</span>
+          </el-descriptions-item>
           <el-descriptions-item label="折扣后学费">
             <span v-if="detailData.payment_type === 'semester_1' || detailData.payment_type === 'semester_2'">¥{{ (detailData.semester_tuition_before_discount - detailData.sibling_discount_amount - detailData.teacher_discount_amount - detailData.alumni_discount_amount - detailData.scholarship_amount - detailData.company_discount_amount).toFixed(2) }}</span>
             <span v-else>¥{{ (detailData.base_tuition - detailData.sibling_discount_amount - detailData.teacher_discount_amount - detailData.alumni_discount_amount - detailData.scholarship_amount - detailData.company_discount_amount).toFixed(2) }}</span>
           </el-descriptions-item>
         </el-descriptions>
-        
+
         <!-- 最终费用 -->
         <el-descriptions :column="1" border title="最终费用" style="margin-top: 15px;">
           <el-descriptions-item label="最终学费">
@@ -464,12 +479,13 @@ export default {
       tableHeight: 531,
       studentOptions: [],
       semesterOptions: [],
-      currentSemesterConfig: null,  // 当前启用的学期配置
-      paymentTypeGroup: 'yearly',  // 用于界面显示的支付方式分组（yearly/semester）
+      currentSemesterConfig: null, // 当前启用的学期配置
+      paymentTypeGroup: 'yearly', // 用于界面显示的支付方式分组（yearly/semester）
       familyOptions: [],
       familyLoading: false,
       allFamilyOptions: [],
       selectedRows: [],
+      downloadAllLoading: false,
       academicYearOptions: ['2025-2026', '2024-2025', '2023-2024'],
       // 支付方式配置常量
       PAYMENT_TYPE_CONFIG: {
@@ -494,13 +510,13 @@ export default {
       isEdit: false,
       uploadAction: '/sljt/tuition/excel/',
       importForm: {
-        academic_year: '2025-2026'
+        academic_year: ''
       },
       tuitionForm: {
         id: null,
         student: null,
         invoice_no: '',
-        academic_year: '2025-2026',
+        academic_year: '',
         is_teacher_child: false,
         payment_type: 'yearly',
         tuition_period: '',
@@ -512,19 +528,20 @@ export default {
         discount_company: 0,
         discount_alumni: 0,
         discount_sibling: 0,
-        scholarship_amount: 0
+        scholarship_amount: 0,
+        scholarship_discount_rate: 0
       },
       detailData: null,
       detailSemesterId: null,
       detailStudentId: null,
-      editOriginData: null,  // 编辑时保存原始数据，用于对比变化
+      editOriginData: null, // 编辑时保存原始数据，用于对比变化
       rules: {
         student: [{ required: true, message: '请选择学生', trigger: 'change' }],
         invoice_no: [{ required: true, message: '请输入家庭编号', trigger: 'blur' }],
         payment_type: [{ required: true, message: '请选择支付方式', trigger: 'change' }],
-        semester: [{ 
-          required: true, 
-          message: '请选择学期', 
+        semester: [{
+          required: true,
+          message: '请选择学期',
           trigger: 'change',
           validator: (rule, value, callback) => {
             if (this.paymentTypeGroup === 'semester' && !value) {
@@ -538,6 +555,8 @@ export default {
     }
   },
   created() {
+    // 初始化默认学年
+    this.initDefaultAcademicYear()
     // 加载列表数据和学生选项（并行）
     this.initPageData()
   },
@@ -548,28 +567,43 @@ export default {
     })
   },
   methods: {
+    // 获取默认学年（当前年份-当前年份+1）
+    getDefaultAcademicYear() {
+      const currentYear = new Date().getFullYear()
+      const nextYear = currentYear + 1
+      return `${currentYear}-${nextYear}`
+    },
+
+    // 初始化默认学年
+    initDefaultAcademicYear() {
+      const defaultYear = this.getDefaultAcademicYear()
+      this.importForm.academic_year = defaultYear
+      this.tuitionForm.academic_year = defaultYear
+      console.log('默认学年:', defaultYear)
+    },
+
     // 初始化页面数据（并行加载）
     async initPageData() {
       console.log('开始加载页面数据...')
       const startTime = Date.now()
-      
+
       // 并行加载列表数据和筛选选项
       await Promise.all([
         this.getList(),
         this.getFamilyOptions(),
         this.getSemesterOptions()
       ])
-      
+
       // 从已加载的数据中提取学年列表
       this.extractAcademicYears()
-      
+
       // 学生选项需要等列表加载完成后再加载（用于新增时过滤）
       this.getStudentOptions()
-      
+
       const endTime = Date.now()
       console.log(`页面数据加载完成，耗时: ${endTime - startTime}ms`)
     },
-    
+
     // 刷新数据
     async refreshCache() {
       this.$message.info('正在刷新数据...')
@@ -578,7 +612,7 @@ export default {
       await this.initPageData()
       this.$message.success('数据已刷新')
     },
-    
+
     // 从列表数据中提取学年列表（去重并排序）
     extractAcademicYears() {
       const years = new Set()
@@ -591,7 +625,7 @@ export default {
       this.academicYearOptions = Array.from(years).sort().reverse()
       console.log('提取的学年列表:', this.academicYearOptions)
     },
-    
+
     // 计算表格最大高度，避免双滚动条
     getTableHeight() {
       this.$nextTick(() => {
@@ -604,20 +638,20 @@ export default {
         this.tableHeight = innerHeight - 50 - headerHeight - operateHeight - 60 - 30 - 32 - 64
       })
     },
-    
+
     // 格式化日期
     formatDate(date) {
       if (!date) return '-'
       return new Date(date).toLocaleString('zh-CN')
     },
-    
+
     // 构建查询参数
     buildQueryParams() {
       const params = {
         page: this.listQuery.page,
         page_size: this.listQuery.page_size
       }
-      
+
       // 添加筛选条件
       if (this.listQuery.invoice_no) {
         params.invoice_no = this.listQuery.invoice_no
@@ -637,23 +671,23 @@ export default {
       if (this.listQuery.email_sent !== '') {
         params.email_sent = this.listQuery.email_sent
       }
-      
+
       return params
     },
-    
+
     // 获取所有学生数据（处理分页）
     async getAllStudents() {
       const allStudents = []
       let page = 1
       const pageSize = 100
       let hasMore = true
-      
+
       try {
         while (hasMore) {
-          const res = await this.$http.get('/students/', { 
-            params: { page: page, page_size: pageSize } 
+          const res = await this.$http.get('/students/', {
+            params: { page: page, page_size: pageSize }
           })
-          
+
           let dataList = []
           if (Array.isArray(res)) {
             dataList = res
@@ -665,14 +699,14 @@ export default {
             dataList = res.data
             hasMore = false
           }
-          
+
           allStudents.push(...dataList)
-          
+
           if (dataList.length < pageSize) {
             hasMore = false
           }
           page++
-          
+
           // 安全限制，最多获取10000条
           if (allStudents.length > 10000) {
             break
@@ -681,10 +715,10 @@ export default {
       } catch (error) {
         console.error('获取学生列表失败:', error)
       }
-      
+
       return allStudents
     },
-    
+
     // 获取列表数据（支持分页）
     async getList() {
       this.listLoading = true
@@ -692,11 +726,11 @@ export default {
         const params = this.buildQueryParams()
         const res = await this.$http.get('/studenttuitioninfo/', { params })
         console.log('学生学费信息返回数据:', res)
-        
+
         // 处理不同可能的返回格式
         let dataList = []
         let totalCount = 0
-        
+
         if (Array.isArray(res)) {
           dataList = res
           totalCount = res.length
@@ -712,20 +746,21 @@ export default {
             totalCount = 1
           }
         }
-        
+
         this.list = dataList.map(item => ({
           ...item,
           is_teacher_child: !!item.is_teacher_child,
           email_sent: !!item.email_sent,
           scholarship_amount: parseFloat(item.scholarship_amount) || 0,
+          scholarship_discount_rate: parseFloat(item.scholarship_discount_rate) || 0,
           discount_company: parseFloat(item.discount_company) || 0,
           discount_alumni: parseFloat(item.discount_alumni) || 0,
           discount_sibling: parseFloat(item.discount_sibling) || 0
         }))
-        
+
         // 使用后端返回的总数
         this.total = totalCount
-        
+
         if (dataList.length === 0 && this.listQuery.page === 1) {
           this.$message.info('暂无学费信息数据')
         }
@@ -738,20 +773,20 @@ export default {
         this.listLoading = false
       }
     },
-    
+
     // 获取所有学费信息（用于过滤已有学费的学生）
     async getAllTuitionInfo() {
       const allTuition = []
       let page = 1
       const pageSize = 100
       let hasMore = true
-      
+
       try {
         while (hasMore) {
-          const res = await this.$http.get('/studenttuitioninfo/', { 
-            params: { page: page, page_size: pageSize } 
+          const res = await this.$http.get('/studenttuitioninfo/', {
+            params: { page: page, page_size: pageSize }
           })
-          
+
           let dataList = []
           if (Array.isArray(res)) {
             dataList = res
@@ -763,14 +798,14 @@ export default {
             dataList = res.data
             hasMore = false
           }
-          
+
           allTuition.push(...dataList)
-          
+
           if (dataList.length < pageSize) {
             hasMore = false
           }
           page++
-          
+
           // 安全限制
           if (allTuition.length > 10000) {
             break
@@ -779,23 +814,23 @@ export default {
       } catch (error) {
         console.error('获取学费信息失败:', error)
       }
-      
+
       return allTuition
     },
-    
+
     // 获取所有学生（处理分页）
     async getAllStudents() {
       const allStudents = []
       let page = 1
       const pageSize = 100
       let hasMore = true
-      
+
       try {
         while (hasMore) {
-          const res = await this.$http.get('/students/', { 
-            params: { page: page, page_size: pageSize } 
+          const res = await this.$http.get('/students/', {
+            params: { page: page, page_size: pageSize }
           })
-          
+
           let dataList = []
           if (Array.isArray(res)) {
             dataList = res
@@ -807,14 +842,14 @@ export default {
             dataList = res.data
             hasMore = false
           }
-          
+
           allStudents.push(...dataList)
-          
+
           if (dataList.length < pageSize) {
             hasMore = false
           }
           page++
-          
+
           // 安全限制
           if (allStudents.length > 10000) {
             break
@@ -823,10 +858,10 @@ export default {
       } catch (error) {
         console.error('获取学生列表失败:', error)
       }
-      
+
       return allStudents
     },
-    
+
     // 获取学生选项（只显示没有学费信息的学生）
     async getStudentOptions() {
       try {
@@ -835,22 +870,22 @@ export default {
           this.getAllStudents(),
           this.getAllTuitionInfo()
         ])
-        
+
         console.log('所有学生数量:', studentsRes.length)
         console.log('已有学费信息的学生数量:', tuitionRes.length)
         console.log('学生名单:', studentsRes.map(s => ({ id: s.id, name: s.english_name || s.last_name + s.first_name })))
         console.log('已有学费的学生ID:', tuitionRes.map(t => t.student))
-        
+
         // 获取已有学费信息的学生ID集合
         const studentsWithTuition = new Set(tuitionRes.map(item => item.student))
-        
+
         // 过滤掉已有学费信息的学生
         const filteredStudents = studentsRes.filter(student => !studentsWithTuition.has(student.id))
-        
+
         console.log('过滤后可选择的学生:', filteredStudents.map(s => ({ id: s.id, name: s.english_name || s.last_name + s.first_name })))
-        
+
         this.studentOptions = filteredStudents
-        
+
         if (filteredStudents.length === 0 && studentsRes.length > 0) {
           this.$message.info('所有学生都已有学费信息')
         }
@@ -859,7 +894,7 @@ export default {
         this.studentOptions = []
       }
     },
-    
+
     // 获取学期选项
     async getSemesterOptions() {
       try {
@@ -875,7 +910,7 @@ export default {
         }
         console.log('学期选项数据:', results)
         this.semesterOptions = results
-        
+
         // 找出当前学期配置（is_current=true）
         const currentConfig = results.find(item => item.is_current)
         if (currentConfig) {
@@ -893,7 +928,7 @@ export default {
         this.semesterOptions = []
       }
     },
-    
+
     // 获取家庭编号选项
     async getFamilyOptions() {
       try {
@@ -925,7 +960,7 @@ export default {
         this.familyOptions = []
       }
     },
-    
+
     // 处理家庭编号模糊搜索
     handleFamilySearch(query) {
       if (query) {
@@ -939,12 +974,12 @@ export default {
         this.familyOptions = this.allFamilyOptions
       }
     },
-    
+
     handleSearch() {
       this.listQuery.page = 1
       this.getList()
     },
-    
+
     handleReset() {
       this.listQuery = {
         page: 1,
@@ -958,22 +993,22 @@ export default {
       }
       this.getList()
     },
-    
+
     // 处理日期变化，自动计算学费期间和天数
     handleDateChange() {
       const start = this.tuitionForm.start_date
       const end = this.tuitionForm.end_date
-      
+
       if (start && end) {
         const startDate = new Date(start)
         const endDate = new Date(end)
-        
+
         // 验证开始日期不晚于结束日期
         if (startDate > endDate) {
           this.$message.warning('开始日期不能晚于结束日期')
           return
         }
-        
+
         // 生成学费期间字符串格式：2025.08.18-2026.06.19
         const formatDate = (date) => {
           const year = date.getFullYear()
@@ -981,9 +1016,9 @@ export default {
           const day = String(date.getDate()).padStart(2, '0')
           return `${year}.${month}.${day}`
         }
-        
+
         this.tuitionForm.tuition_period = `${formatDate(startDate)}-${formatDate(endDate)}`
-        
+
         // 计算天数（包含起止日期）
         const diffTime = Math.abs(endDate - startDate)
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
@@ -993,22 +1028,22 @@ export default {
         this.tuitionForm.tuition_period_days = null
       }
     },
-    
+
     handleSizeChange(val) {
       this.listQuery.page = 1
       this.listQuery.page_size = val
       this.getList()
     },
-    
+
     handleCurrentChange(val) {
       this.listQuery.page = val
       this.getList()
     },
-    
+
     handleSelectionChange(val) {
       this.selectedRows = val
     },
-    
+
     handleAdd() {
       this.isEdit = false
       this.editOriginData = null
@@ -1031,14 +1066,15 @@ export default {
         discount_company: 0,
         discount_alumni: 0,
         discount_sibling: 0,
-        scholarship_amount: 0
+        scholarship_amount: 0,
+        scholarship_discount_rate: 0
       }
       this.dialogVisible = true
       this.$nextTick(() => {
         this.$refs.tuitionForm && this.$refs.tuitionForm.clearValidate()
       })
     },
-    
+
     // 支付方式变化处理
     handlePaymentTypeChange(val) {
       const cfg = this.PAYMENT_TYPE_CONFIG
@@ -1050,31 +1086,31 @@ export default {
         this.updatePaymentTypeBySemester()
       }
     },
-    
+
     // 根据选择的学期更新 payment_type
     handleSemesterChange(semesterId) {
       this.updatePaymentTypeBySemester()
     },
-    
+
     // 根据学期选项更新 payment_type
     updatePaymentTypeBySemester() {
       const cfg = this.PAYMENT_TYPE_CONFIG
       const semesterId = this.tuitionForm.semester
       if (!semesterId) return
-      
+
       const selected = this.semesterOptions.find(item => item.id == semesterId)
       if (!selected) return
-      
+
       let num = selected.semester_number
       if (num == null && selected.name) {
         if (selected.name.includes('一') || selected.name.includes('1')) num = 1
         else if (selected.name.includes('二') || selected.name.includes('2')) num = 2
       }
-      
+
       if (num == 1) this.tuitionForm.payment_type = cfg.SEMESTER_1.value
       else if (num == 2) this.tuitionForm.payment_type = cfg.SEMESTER_2.value
     },
-    
+
     handleEdit(row) {
       this.isEdit = true
       this.dialogTitle = '编辑学费信息'
@@ -1093,7 +1129,7 @@ export default {
       const cfg = this.PAYMENT_TYPE_CONFIG
       const isSemester = row.payment_type === cfg.SEMESTER_1.value || row.payment_type === cfg.SEMESTER_2.value
       this.paymentTypeGroup = isSemester ? cfg.SEMESTER_1.group : cfg.YEARLY.group
-      
+
       // 保存原始数据，用于对比变化
       this.editOriginData = {
         student: row.student,
@@ -1108,10 +1144,11 @@ export default {
         discount_company: parseFloat(row.discount_company) || 0,
         discount_alumni: parseFloat(row.discount_alumni) || 0,
         discount_sibling: parseFloat(row.discount_sibling) || 0,
-        scholarship_amount: parseFloat(row.scholarship_amount) || 0
+        scholarship_amount: parseFloat(row.scholarship_amount) || 0,
+        scholarship_discount_rate: parseFloat(row.scholarship_discount_rate) || 0
       }
-      
-      this.tuitionForm = { 
+
+      this.tuitionForm = {
         id: row.id,
         student: row.student,
         invoice_no: row.invoice_no || '',
@@ -1127,21 +1164,22 @@ export default {
         discount_company: parseFloat(row.discount_company) || 0,
         discount_alumni: parseFloat(row.discount_alumni) || 0,
         discount_sibling: parseFloat(row.discount_sibling) || 0,
-        scholarship_amount: parseFloat(row.scholarship_amount) || 0
+        scholarship_amount: parseFloat(row.scholarship_amount) || 0,
+        scholarship_discount_rate: parseFloat(row.scholarship_discount_rate) || 0
       }
       this.dialogVisible = true
       this.$nextTick(() => {
         this.$refs.tuitionForm && this.$refs.tuitionForm.clearValidate()
       })
     },
-    
+
     async handleViewDetail(row) {
       this.detailStudentId = row.student_id
       // 默认使用当前学期（is_current=true）
       this.detailSemesterId = this.currentSemesterConfig ? this.currentSemesterConfig.id : null
       await this.calculateStudentDetail()
     },
-    
+
     // 计算学生详情
     async calculateStudentDetail() {
       try {
@@ -1149,7 +1187,7 @@ export default {
           action: 'calculate_student',
           student_id: this.detailStudentId
         }
-        
+
         // 使用选中的学期配置ID（默认是当前学期）
         if (this.detailSemesterId) {
           params.semester_config_id = this.detailSemesterId
@@ -1159,15 +1197,15 @@ export default {
           params.semester_config_id = this.currentSemesterConfig.id
           console.log('使用当前学期配置:', this.currentSemesterConfig.name)
         }
-        
+
         const res = await this.$http.post('/tuition/calculate/', params)
-        
+
         // 获取当前行数据补充学生信息
         const row = this.list.find(item => item.student_id === this.detailStudentId) || {}
-        
+
         // 后端返回的数据格式: { student_id, invoice_no, child_order, tuition_detail }
         const tuitionDetail = res.data.tuition_detail || res.data
-        
+
         this.detailData = {
           ...tuitionDetail,
           student_id: res.data.student_id || this.detailStudentId,
@@ -1181,12 +1219,12 @@ export default {
         this.$message.error('获取详情失败')
       }
     },
-    
+
     // 详情对话框学期切换
     handleDetailSemesterChange(val) {
       this.detailSemesterId = val
     },
-    
+
     // 重新计算详情
     async recalculateDetail() {
       if (!this.detailSemesterId) {
@@ -1196,7 +1234,7 @@ export default {
       await this.calculateStudentDetail()
       this.$message.success('重新计算完成')
     },
-    
+
     async handleDelete(row) {
       try {
         await this.$confirm('确认删除该学费信息?', '提示', {
@@ -1213,7 +1251,7 @@ export default {
         }
       }
     },
-    
+
     async handleSubmit() {
       this.$refs.tuitionForm.validate(async(valid) => {
         if (valid) {
@@ -1224,15 +1262,15 @@ export default {
             } else if (this.paymentTypeGroup === 'yearly') {
               this.tuitionForm.payment_type = this.PAYMENT_TYPE_CONFIG.YEARLY.value
             }
-            
+
             const cfg = this.PAYMENT_TYPE_CONFIG
             const form = this.tuitionForm
-            
+
             // 计算 semester 值
             let semesterValue = 0
             if (form.payment_type === cfg.SEMESTER_1.value) semesterValue = 1
             else if (form.payment_type === cfg.SEMESTER_2.value) semesterValue = 2
-            
+
             // 构建完整提交数据
             const fullData = {
               student: form.student,
@@ -1245,23 +1283,24 @@ export default {
               semester: semesterValue,
               registration_fee: form.registration_fee ? parseFloat(form.registration_fee) : null,
               scholarship_amount: parseFloat(form.scholarship_amount) || 0,
+              scholarship_discount_rate: parseFloat(form.scholarship_discount_rate) || 0,
               discount_company: parseFloat(form.discount_company) || 0,
               discount_alumni: parseFloat(form.discount_alumni) || 0,
               discount_sibling: parseFloat(form.discount_sibling) || 0
             }
-            
+
             let submitData
-            
+
             if (this.isEdit) {
               // 编辑模式：只提交变化的值
               submitData = {}
               const origin = this.editOriginData
-              
+
               // 对比每个字段，只添加变化的值
               for (const key in fullData) {
                 const newVal = fullData[key]
                 const oldVal = origin[key]
-                
+
                 // 处理数字精度问题（浮点数比较）
                 if (typeof newVal === 'number' && typeof oldVal === 'number') {
                   if (Math.abs(newVal - oldVal) > 0.001) {
@@ -1271,14 +1310,14 @@ export default {
                   submitData[key] = newVal
                 }
               }
-              
+
               // 如果没有变化，提示用户
               if (Object.keys(submitData).length === 0) {
                 this.$message.info('没有修改任何数据')
                 this.dialogVisible = false
                 return
               }
-              
+
               console.log('编辑提交（仅变化字段）:', submitData)
               await this.$http.patch(`/studenttuitioninfo/${form.id}/`, submitData)
               this.$message.success('更新成功')
@@ -1298,7 +1337,7 @@ export default {
         }
       })
     },
-    
+
     async handleBatchEmail() {
       if (this.selectedRows.length === 0) {
         this.$message.warning('请选择要发送邮件的学生')
@@ -1316,25 +1355,86 @@ export default {
         this.$message.error('邮件发送失败')
       }
     },
-    
+
+    // 一键下载所有PDF
+    async handleDownloadAllPdfs() {
+      try {
+        await this.$confirm('即将下载所有家庭的学费PDF文件，打包成zip格式。根据数据量大小，可能需要一些时间，请耐心等待。', '确认下载', {
+          confirmButtonText: '确认下载',
+          cancelButtonText: '取消',
+          type: 'info'
+        })
+
+        this.downloadAllLoading = true
+        this.$message.info('正在生成PDF文件，请稍候...')
+
+        // 发送请求，设置responseType为blob以接收文件流
+        const response = await this.$http.post('/tuition/email/', {
+          action: 'download_all_pdfs'
+        }, {
+          responseType: 'blob'
+        })
+
+        // 从响应头获取文件名
+        const contentDisposition = response.headers['content-disposition']
+        let filename = 'All_Tuition_Invoices.zip'
+        if (contentDisposition) {
+          const filenameMatch = contentDisposition.match(/filename="?(.+?)"?$/)
+          if (filenameMatch) {
+            filename = filenameMatch[1]
+          }
+        }
+
+        // 获取生成统计信息
+        const generatedCount = response.headers['x-generated-count'] || 0
+        const failedCount = response.headers['x-failed-count'] || 0
+
+        // 创建下载链接
+        const blob = new Blob([response.data], { type: 'application/zip' })
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = filename
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+
+        // 显示成功消息
+        let msg = `下载成功，共生成 ${generatedCount} 个PDF文件`
+        if (parseInt(failedCount) > 0) {
+          msg += `，${failedCount} 个失败`
+        }
+        this.$message.success(msg)
+      } catch (error) {
+        if (error === 'cancel') {
+          return
+        }
+        console.error('下载失败:', error)
+        this.$message.error('下载失败：' + (error.message || '网络错误'))
+      } finally {
+        this.downloadAllLoading = false
+      }
+    },
+
     handleExport() {
       this.$message.info('导出功能开发中...')
     },
-    
+
     handleImport() {
       this.importDialogVisible = true
     },
-    
+
     beforeUpload(file) {
       // 验证是否选择了学年
       if (!this.importForm.academic_year) {
         this.$message.error('请先选择学年!')
         return false
       }
-      
-      const isExcel = file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
+
+      const isExcel = file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
                       file.type === 'application/vnd.ms-excel' ||
-                      file.name.endsWith('.xlsx') || 
+                      file.name.endsWith('.xlsx') ||
                       file.name.endsWith('.xls')
       const isLt10M = file.size / 1024 / 1024 < 10
 
@@ -1348,37 +1448,97 @@ export default {
       }
       return true
     },
-    
+
     handleUploadSuccess(response) {
       if (response.code === 1 || response.success) {
-        const successCount = response.data?.success_count || response.success_count || 0
-        const failCount = response.data?.fail_count || response.fail_count || 0
-        const message = response.data?.message || response.message || '导入成功'
-        
-        this.$alert(
-          `<div style="text-align: center;">
-            <i class="el-icon-success" style="font-size: 48px; color: #67c23a; margin-bottom: 15px;"></i>
-            <div style="font-size: 16px; margin-bottom: 10px;">${message}</div>
-            <div style="color: #909399;">
-              成功导入: <span style="color: #67c23a; font-weight: bold;">${successCount}</span> 条记录
-              ${failCount > 0 ? `<br>失败: <span style="color: #f56c6c; font-weight: bold;">${failCount}</span> 条记录` : ''}
+        const data = response.data || {}
+        const successCount = data.success_count || 0
+        const createCount = data.create_count || 0
+        const updateCount = data.update_count || 0
+        const errorCount = data.error_count || 0
+        const errors = data.errors || []
+        const totalRows = data.total_rows || 0
+
+        // 构建成功信息
+        let successHtml = `
+          <div style="text-align: center; margin-bottom: 20px;">
+            <i class="el-icon-success" style="font-size: 48px; color: #67c23a;"></i>
+            <div style="font-size: 16px; margin-top: 15px; color: #67c23a; font-weight: bold;">导入成功</div>
+          </div>
+          <div style="background: #f5f7fa; padding: 15px; border-radius: 4px; margin-bottom: 15px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+              <span>Excel总行数:</span><span style="font-weight: bold;">${totalRows}</span>
             </div>
-          </div>`,
-          '导入完成',
-          {
-            confirmButtonText: '确定',
-            dangerouslyUseHTMLString: true,
-            callback: () => {
-              this.importDialogVisible = false
-              this.getList()
-            }
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+              <span>成功导入:</span><span style="color: #67c23a; font-weight: bold;">${successCount}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+              <span>新增记录:</span><span style="color: #409eff; font-weight: bold;">${createCount}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+              <span>更新记录:</span><span style="color: #e6a23c; font-weight: bold;">${updateCount}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span>失败记录:</span><span style="color: #f56c6c; font-weight: bold;">${errorCount}</span>
+            </div>
+          </div>
+        `
+
+        // 如果有错误，显示错误列表
+        let errorsHtml = ''
+        if (errors.length > 0) {
+          errorsHtml = `
+            <div style="margin-top: 15px;">
+              <div style="color: #f56c6c; font-weight: bold; margin-bottom: 10px; border-bottom: 1px solid #dcdfe6; padding-bottom: 8px;">
+                <i class="el-icon-warning"></i> 导入失败明细 (${errors.length}条)
+              </div>
+              <div style="max-height: 300px; overflow-y: auto;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                  <thead style="position: sticky; top: 0; background: #f5f7fa;">
+                    <tr>
+                      <th style="border: 1px solid #dcdfe6; padding: 8px; text-align: center; width: 60px;">行号</th>
+                      <th style="border: 1px solid #dcdfe6; padding: 8px; text-align: center; width: 100px;">学号</th>
+                      <th style="border: 1px solid #dcdfe6; padding: 8px; text-align: center;">错误原因</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${errors.map(err => `
+                      <tr>
+                        <td style="border: 1px solid #dcdfe6; padding: 8px; text-align: center;">${err.row || '-'}</td>
+                        <td style="border: 1px solid #dcdfe6; padding: 8px; text-align: center;">${err.student_no || '-'}</td>
+                        <td style="border: 1px solid #dcdfe6; padding: 8px; color: #f56c6c;">${err.error || '未知错误'}</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          `
+        }
+
+        // 使用 MessageBox 显示弹窗，需要手动关闭
+        this.$msgbox({
+          title: '导入结果',
+          message: successHtml + errorsHtml,
+          dangerouslyUseHTMLString: true,
+          showClose: true,
+          closeOnClickModal: false,
+          closeOnPressEscape: false,
+          showCancelButton: false,
+          showConfirmButton: true,
+          confirmButtonText: '关闭',
+          beforeClose: (action, instance, done) => {
+            // 关闭弹窗后刷新列表并关闭导入对话框
+            this.importDialogVisible = false
+            this.getList()
+            done()
           }
-        )
+        })
       } else {
         this.$message.error(response.message || '导入失败')
       }
     },
-    
+
     handleUploadError(error) {
       let message = '导入失败'
       try {
@@ -1389,7 +1549,14 @@ export default {
       }
       this.$message.error(message)
     },
-    
+
+    handleUploadProgress(event, file) {
+      // 当上传进度为100%时，显示正在导入的提示
+      if (event.percent === 100) {
+        this.$message.info('正在导入中，勿重复导入')
+      }
+    },
+
     handleDownloadTemplate() {
       // 下载导入模板
       const templateUrl = '/sljt/tuition/excel/template/'

@@ -63,6 +63,12 @@ export const constantRoutes = [
         path: 'calculation',
         name: 'CalculationConfig',
         component: () => import('@/views/tuitionConfig/calculation'),
+        meta: { title: '计算规则' }
+      },
+      {
+        path: 'calendar',
+        name: 'SchoolCalendar',
+        component: () => import('@/views/tuitionConfig/calendar'),
         meta: { title: '校历' }
       }
     ]

@@ -6,13 +6,32 @@
         <el-button type="primary" icon="el-icon-plus" @click="handleAdd">新增年级配置</el-button>
         <el-button icon="el-icon-refresh" @click="getList">刷新</el-button>
       </div>
+      <!-- 筛选区域 -->
+      <div class="filter-container" style="margin-top: 15px;">
+        <el-select
+          v-model="filterAcademicYear"
+          placeholder="选择学年筛选"
+          clearable
+          style="width: 200px; margin-right: 10px;"
+          @change="handleFilterChange"
+        >
+          <el-option
+            v-for="year in academicYearOptions"
+            :key="year"
+            :label="year"
+            :value="year"
+          />
+        </el-select>
+        <el-button type="primary" icon="el-icon-search" @click="handleFilter">筛选</el-button>
+        <el-button icon="el-icon-refresh-left" @click="handleResetFilter">重置</el-button>
+      </div>
     </el-card>
 
     <!-- 数据表格 -->
     <el-card class="table-container" shadow="never" style="margin-top: 15px;">
       <el-table
         v-loading="listLoading"
-        :data="list"
+        :data="filteredList"
         element-loading-text="加载中..."
         border
         fit
@@ -23,9 +42,14 @@
         <el-table-column label="学年" prop="academic_year" align="center" min-width="120" />
         <el-table-column label="年级名称" prop="grade_name" align="center" min-width="120" />
         <el-table-column label="年级代码" prop="grade_code" align="center" min-width="120" />
-        <el-table-column label="基础学费" prop="base_tuition" align="center" min-width="150">
+        <el-table-column label="基础学费(全年)" prop="base_tuition" align="center" min-width="150">
           <template slot-scope="scope">
             <span class="amount-text">¥{{ formatMoney(scope.row.base_tuition) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="基础学费(学期)" prop="semester_base_tuition" align="center" min-width="150">
+          <template slot-scope="scope">
+            <span class="amount-text">¥{{ formatMoney(scope.row.semester_base_tuition) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="注册费" prop="registration_fee" align="center" min-width="120">
@@ -48,7 +72,7 @@
       </el-table>
 
       <!-- 空状态提示 -->
-      <div v-if="!listLoading && list.length === 0" style="text-align: center; padding: 40px 0;">
+      <div v-if="!listLoading && filteredList.length === 0" style="text-align: center; padding: 40px 0;">
         <i class="el-icon-warning-outline" style="font-size: 48px; color: #909399;" />
         <p style="color: #909399; margin-top: 10px;">暂无数据，请点击"新增年级配置"按钮添加</p>
       </div>
@@ -56,7 +80,7 @@
 
     <!-- 编辑/新增对话框 -->
     <el-dialog :title="dialogTitle" :visible.sync="dialogVisible" width="600px">
-      <el-form ref="gradeForm" :model="gradeForm" :rules="rules" label-width="120px">
+      <el-form ref="gradeForm" :model="gradeForm" :rules="rules" label-width="130px">
         <el-form-item label="学年" prop="academic_year">
           <el-input v-model="gradeForm.academic_year" placeholder="如：2025-2026" />
         </el-form-item>
@@ -66,8 +90,11 @@
         <el-form-item label="年级代码" prop="grade_code">
           <el-input v-model="gradeForm.grade_code" placeholder="如：P5" />
         </el-form-item>
-        <el-form-item label="基础学费" prop="base_tuition">
+        <el-form-item label="基础学费(全年)" prop="base_tuition">
           <el-input-number v-model="gradeForm.base_tuition" :min="0" :precision="2" style="width: 100%;" />
+        </el-form-item>
+        <el-form-item label="基础学费(学期)" prop="semester_base_tuition">
+          <el-input-number v-model="gradeForm.semester_base_tuition" :min="0" :precision="2" style="width: 100%;" />
         </el-form-item>
         <el-form-item label="注册费" prop="registration_fee">
           <el-input-number v-model="gradeForm.registration_fee" :min="0" :precision="2" style="width: 100%;" />
@@ -98,12 +125,16 @@ export default {
       dialogVisible: false,
       dialogTitle: '',
       isEdit: false,
+      // 筛选相关
+      filterAcademicYear: '',
+      academicYearOptions: [],
       gradeForm: {
         id: null,
         academic_year: '',
         grade_name: '',
         grade_code: '',
         base_tuition: 165000,
+        semester_base_tuition: 0,
         registration_fee: 2000,
         sort_order: 0,
         is_active: true
@@ -113,8 +144,18 @@ export default {
         grade_name: [{ required: true, message: '请输入年级名称', trigger: 'blur' }],
         grade_code: [{ required: true, message: '请输入年级代码', trigger: 'blur' }],
         base_tuition: [{ required: true, message: '请输入基础学费', trigger: 'blur' }],
+        semester_base_tuition: [{ required: true, message: '请输入学期基础学费', trigger: 'blur' }],
         registration_fee: [{ required: true, message: '请输入注册费', trigger: 'blur' }]
       }
+    }
+  },
+  computed: {
+    // 根据筛选条件过滤后的列表
+    filteredList() {
+      if (!this.filterAcademicYear) {
+        return this.list
+      }
+      return this.list.filter(item => item.academic_year === this.filterAcademicYear)
     }
   },
   created() {
@@ -142,13 +183,24 @@ export default {
       if (value === null || value === undefined) return '0.00'
       return parseFloat(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     },
+    // 提取所有学年选项
+    extractAcademicYears(dataList) {
+      const years = new Set()
+      dataList.forEach(item => {
+        if (item.academic_year) {
+          years.add(item.academic_year)
+        }
+      })
+      // 按降序排列（最新的学年在前）
+      this.academicYearOptions = Array.from(years).sort((a, b) => b.localeCompare(a))
+    },
     // 获取年级配置列表
     async getList() {
       this.listLoading = true
       try {
         const res = await this.$http.get('/gradetuitionconfig/')
         console.log('年级配置返回数据:', res)
-        
+
         // 处理不同可能的返回格式
         let dataList = []
         if (Array.isArray(res)) {
@@ -164,9 +216,12 @@ export default {
           // 可能是对象形式，尝试提取
           dataList = [res]
         }
-        
+
         this.list = dataList
-        
+
+        // 提取学年选项
+        this.extractAcademicYears(dataList)
+
         if (dataList.length === 0) {
           this.$message.info('暂无年级配置数据')
         }
@@ -174,8 +229,27 @@ export default {
         console.error('获取年级配置失败:', error)
         this.$message.error('获取年级配置失败: ' + (error.message || '网络错误'))
         this.list = []
+        this.academicYearOptions = []
       } finally {
         this.listLoading = false
+      }
+    },
+    // 筛选按钮点击
+    handleFilter() {
+      // 筛选通过computed属性自动生效，这里可以添加额外的逻辑
+      if (this.filterAcademicYear) {
+        this.$message.success(`已筛选学年: ${this.filterAcademicYear}`)
+      }
+    },
+    // 重置筛选
+    handleResetFilter() {
+      this.filterAcademicYear = ''
+      this.$message.info('已重置筛选条件')
+    },
+    // 筛选条件改变
+    handleFilterChange(value) {
+      if (!value) {
+        this.filterAcademicYear = ''
       }
     },
     // 新增
@@ -188,6 +262,7 @@ export default {
         grade_name: '',
         grade_code: '',
         base_tuition: 165000,
+        semester_base_tuition: 0,
         registration_fee: 2000,
         sort_order: 0,
         is_active: true
@@ -202,12 +277,13 @@ export default {
     handleEdit(row) {
       this.isEdit = true
       this.dialogTitle = '编辑年级配置'
-      this.gradeForm = { 
+      this.gradeForm = {
         id: row.id,
         academic_year: row.academic_year || '',
         grade_name: row.grade_name || '',
         grade_code: row.grade_code || '',
         base_tuition: parseFloat(row.base_tuition) || 0,
+        semester_base_tuition: parseFloat(row.semester_base_tuition) || 0,
         registration_fee: parseFloat(row.registration_fee) || 0,
         sort_order: row.sort_order || 0,
         is_active: row.is_active !== false
@@ -238,13 +314,15 @@ export default {
     },
     // 状态变更
     async handleStatusChange(row) {
+      const newStatus = row.is_active
       try {
-        await this.$http.patch(`/gradetuitionconfig/${row.id}/`, { is_active: row.is_active })
+        await this.$http.patch(`/gradetuitionconfig/${row.id}/`, { is_active: newStatus })
         this.$message.success('状态更新成功')
       } catch (error) {
         console.error('状态更新失败:', error)
         this.$message.error('状态更新失败')
-        row.is_active = !row.is_active
+        // 恢复原始状态
+        this.$set(row, 'is_active', !newStatus)
       }
     },
     // 提交表单
@@ -256,10 +334,11 @@ export default {
             const submitData = {
               ...this.gradeForm,
               base_tuition: parseFloat(this.gradeForm.base_tuition) || 0,
+              semester_base_tuition: parseFloat(this.gradeForm.semester_base_tuition) || 0,
               registration_fee: parseFloat(this.gradeForm.registration_fee) || 0,
               sort_order: parseInt(this.gradeForm.sort_order) || 0
             }
-            
+
             if (this.isEdit) {
               await this.$http.put(`/gradetuitionconfig/${this.gradeForm.id}/`, submitData)
               this.$message.success('更新成功')
@@ -287,6 +366,12 @@ export default {
       margin-right: 10px;
     }
   }
+}
+
+.filter-container {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .amount-text {
