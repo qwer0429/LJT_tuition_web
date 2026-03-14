@@ -276,19 +276,9 @@
         </el-row>
         <el-divider content-position="left">折扣信息</el-divider>
         <el-row :gutter="20">
-          <el-col :span="8">
+          <el-col :span="24">
             <el-form-item label="教师子弟">
               <el-switch v-model="tuitionForm.is_teacher_child" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="校友折扣">
-              <el-input-number v-model="tuitionForm.discount_alumni" :min="0" :precision="2" :controls="true" controls-position="right" style="width: 100%;" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="公司折扣">
-              <el-input-number v-model="tuitionForm.discount_company" :min="0" :precision="2" :controls="true" controls-position="right" style="width: 100%;" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -299,15 +289,20 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="奖学金比例(%)">
+            <el-form-item label="奖学金折扣(%)">
               <el-input-number v-model="tuitionForm.scholarship_discount_rate" :min="0" :max="100" :precision="2" :controls="true" controls-position="right" style="width: 100%;" />
             </el-form-item>
           </el-col>
         </el-row>
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="学弟姐妹折扣">
-              <el-input-number v-model="tuitionForm.discount_sibling" :min="0" :precision="2" :controls="true" controls-position="right" style="width: 100%;" />
+            <el-form-item label="公司折扣">
+              <el-input-number v-model="tuitionForm.discount_company" :min="0" :precision="2" :controls="true" controls-position="right" style="width: 100%;" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="校友折扣">
+              <el-input-number v-model="tuitionForm.discount_alumni" :min="0" :precision="2" :controls="true" controls-position="right" style="width: 100%;" />
             </el-form-item>
           </el-col>
         </el-row>
