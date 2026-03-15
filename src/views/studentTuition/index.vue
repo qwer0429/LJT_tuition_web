@@ -357,7 +357,7 @@
               <el-option
                 v-for="item in semesterOptions"
                 :key="item.id"
-                :label="item.name + ' (' + item.total_working_days + '个工作日)' + (item.is_current ? ' [当前学期]' : '')"
+                :label="item.name + ' (' + (item.total_teaching_days || 0) + '个到校日)' + (item.is_active ? ' [启用]' : '')"
                 :value="item.id"
               />
             </el-select>
@@ -893,8 +893,8 @@ export default {
     // 获取学期选项
     async getSemesterOptions() {
       try {
-        // 获取所有学期配置，不过滤 is_active
-        const res = await this.$http.get('/semesterconfig/', { params: { ordering: '-academic_year,semester_number' }})
+        // 获取所有学期
+        const res = await this.$http.get('/semester/', { params: { ordering: '-academic_year,semester' }})
         let results = []
         if (Array.isArray(res)) {
           results = res
@@ -906,16 +906,12 @@ export default {
         console.log('学期选项数据:', results)
         this.semesterOptions = results
 
-        // 找出当前学期配置（is_current=true）
-        const currentConfig = results.find(item => item.is_current)
-        if (currentConfig) {
-          this.currentSemesterConfig = currentConfig
-          console.log('当前学期配置:', currentConfig.name)
-        } else if (results.length > 0) {
-          // 如果没有标记为当前学期的，使用第一个启用的
+        // 使用第一个启用的学期作为当前学期
+        if (results.length > 0) {
           const activeConfig = results.find(item => item.is_active)
           if (activeConfig) {
             this.currentSemesterConfig = activeConfig
+            console.log('当前学期:', activeConfig.name)
           }
         }
       } catch (error) {
@@ -1170,7 +1166,7 @@ export default {
 
     async handleViewDetail(row) {
       this.detailStudentId = row.student_id
-      // 默认使用当前学期（is_current=true）
+      // 默认使用当前启用的学期
       this.detailSemesterId = this.currentSemesterConfig ? this.currentSemesterConfig.id : null
       await this.calculateStudentDetail()
     },
@@ -1183,14 +1179,14 @@ export default {
           student_id: this.detailStudentId
         }
 
-        // 使用选中的学期配置ID（默认是当前学期）
+        // 使用选中的学期ID（默认是当前学期）
         if (this.detailSemesterId) {
-          params.semester_config_id = this.detailSemesterId
-          console.log('使用学期配置ID:', this.detailSemesterId)
+          params.semester_id = this.detailSemesterId
+          console.log('使用学期ID:', this.detailSemesterId)
         } else if (this.currentSemesterConfig) {
           // 如果没有选中且存在当前学期配置，使用当前学期
-          params.semester_config_id = this.currentSemesterConfig.id
-          console.log('使用当前学期配置:', this.currentSemesterConfig.name)
+          params.semester_id = this.currentSemesterConfig.id
+          console.log('使用当前学期:', this.currentSemesterConfig.name)
         }
 
         const res = await this.$http.post('/tuition/calculate/', params)
@@ -1344,7 +1340,7 @@ export default {
           action: 'send_batch',
           invoice_nos: invoiceNos
         })
-        this.$message.success('邮件发送成功')
+        this.$message.success('批量邮件发送任务已启动，正在后台发送中，请稍后刷新页面查看状态')
         this.getList()
       } catch (error) {
         this.$message.error('邮件发送失败')

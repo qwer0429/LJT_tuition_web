@@ -54,12 +54,6 @@ export const constantRoutes = [
         meta: { title: '年级学费配置' }
       },
       {
-        path: 'semester',
-        name: 'SemesterConfig',
-        component: () => import('@/views/tuitionConfig/semester'),
-        meta: { title: '学期配置' }
-      },
-      {
         path: 'calculation',
         name: 'CalculationConfig',
         component: () => import('@/views/tuitionConfig/calculation'),

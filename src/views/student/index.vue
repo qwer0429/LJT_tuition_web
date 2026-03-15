@@ -4,8 +4,8 @@
     <el-card class="filter-container" shadow="never">
       <div style="overflow: hidden;">
         <el-form :inline="true" :model="listQuery" class="demo-form-inline">
-          <el-form-item label="班级：">
-            <el-select v-model="listQuery.class_name" placeholder="请选择班级" clearable filterable style="width: 200px;">
+          <el-form-item label="年级：">
+            <el-select v-model="listQuery.class_name" placeholder="请选择年级" clearable filterable style="width: 200px;">
               <el-option
                 v-for="item in classOptions"
                 :key="item"
@@ -50,7 +50,7 @@
         :max-height="tableHeight"
       >
         <el-table-column type="selection" width="55" align="center" />
-        <el-table-column label="班级" prop="class_name" align="center" min-width="120" />
+        <el-table-column label="年级" prop="class_name" align="center" min-width="120" />
         <el-table-column label="学号" prop="student_no" align="center" min-width="120" />
         <el-table-column label="姓" prop="last_name" align="center" min-width="100" />
         <el-table-column label="名" prop="first_name" align="center" min-width="100" />
@@ -121,8 +121,8 @@
       <el-form ref="studentForm" :model="studentForm" :rules="rules" label-width="120px">
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="班级" prop="class_name">
-              <el-input v-model="studentForm.class_name" placeholder="请输入班级" />
+            <el-form-item label="年级" prop="class_name">
+              <el-input v-model="studentForm.class_name" placeholder="请输入年级" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -240,7 +240,7 @@ export default {
         parent2_email_address: ''
       },
       rules: {
-        class_name: [{ required: true, message: '请输入班级', trigger: 'blur' }],
+        class_name: [{ required: true, message: '请输入年级', trigger: 'blur' }],
         student_no: [{ required: true, message: '请输入学号', trigger: 'blur' }],
         last_name: [{ required: true, message: '请输入姓', trigger: 'blur' }],
         first_name: [{ required: true, message: '请输入名', trigger: 'blur' }],
@@ -312,14 +312,14 @@ export default {
       }
     },
     
-    // 获取班级选项
+    // 获取年级选项
     async getClassOptions() {
       try {
         const res = await this.$http.get('/get_all_class_and_student/')
-        console.log('班级选项返回数据:', res)
+        console.log('年级选项返回数据:', res)
         this.classOptions = res.class_name || []
       } catch (error) {
-        console.error('获取班级列表失败:', error)
+        console.error('获取年级列表失败:', error)
         this.classOptions = []
       }
     },

@@ -7,11 +7,11 @@
       </div>
       <el-form :inline="true" :model="calcForm" class="demo-form-inline">
         <el-form-item label="选择学期：">
-          <el-select v-model="calcForm.semester_config_id" placeholder="请选择学期" style="width: 320px;">
+          <el-select v-model="calcForm.semester_id" placeholder="请选择学期" style="width: 320px;">
             <el-option
               v-for="item in semesterOptions"
               :key="item.id"
-              :label="item.name + ' (' + item.total_working_days + '个工作日)' + (item.is_current ? ' [当前学期]' : '')"
+              :label="item.name + ' (' + (item.total_teaching_days || 0) + '个到校日)' + (item.is_active ? ' [启用]' : '')"
               :value="item.id"
             />
           </el-select>
@@ -21,7 +21,7 @@
         </el-form-item>
         <el-form-item>
           <el-button type="primary" icon="el-icon-s-claim" @click="handleCalculateAll">计算所有家庭</el-button>
-          <el-button type="success" icon="el-icon-message" @click="handleSendBatchEmailClick">批量发送邮件</el-button>
+          <el-button type="success" icon="el-icon-message" @click="handleSendBatchEmail">批量发送邮件</el-button>
           <el-button type="warning" icon="el-icon-download" :loading="downloadAllLoading" @click="handleDownloadAllPdfs">一键下载所有PDF</el-button>
           <el-button type="info" icon="el-icon-document" @click="handleManualPdfDialog">手动生成PDF</el-button>
           <el-button icon="el-icon-refresh" @click="refreshCache">刷新</el-button>
@@ -402,8 +402,8 @@
                 </el-form-item>
               </el-col>
               <el-col :span="8">
-                <el-form-item label="班级" :prop="'students.' + index + '.class_name'" :rules="{ required: true, message: '请输入班级', trigger: 'blur' }">
-                  <el-input v-model="student.class_name" placeholder="如：M3B" />
+                <el-form-item label="年级" :prop="'students.' + index + '.grade'" :rules="{ required: true, message: '请输入年级', trigger: 'blur' }">
+                  <el-input v-model="student.grade" placeholder="如：M3B" />
                 </el-form-item>
               </el-col>
             </el-row>
@@ -513,8 +513,8 @@ export default {
   data() {
     return {
       calcForm: {
-        academic_year: '2025-2026',
-        semester_config_id: null  // null 表示使用当前学期（启用的配置）
+        academic_year: '2026-2027',
+        semester_id: null  // null 表示使用当前学期（启用的配置）
       },
       selectedFamily: '',
       familyOptions: [],
@@ -544,6 +544,8 @@ export default {
       currentEmailFamily: null,
       emailAttachmentList: [],
       batchEmailAttachmentList: [],
+      emailStatusPolling: null,  // 邮件状态轮询定时器
+      emailSendingInvoiceNo: null,  // 当前正在查询发送状态的invoice_no
       manualPdfDialogVisible: false,
       manualPdfLoading: false,
       manualPdfForm: {
@@ -558,7 +560,7 @@ export default {
         students: [{
           english_name: '',
           student_no: '',
-          class_name: '',
+          grade: '',
           base_tuition: 165000,
           sibling_discount_rate: 0,
           sibling_discount_amount: 0,
@@ -688,8 +690,8 @@ export default {
     },
     async getSemesterOptions() {
       try {
-        // 获取所有启用的学期配置，不过滤 is_active，因为当前学期可能不是启用的
-        const res = await this.$http.get('/semesterconfig/', { params: { ordering: '-academic_year,semester_number' }})
+        // 获取所有启用的学期
+        const res = await this.$http.get('/semester/', { params: { ordering: '-academic_year,semester' }})
         let results = []
         if (Array.isArray(res)) {
           results = res
@@ -700,20 +702,15 @@ export default {
         }
         this.semesterOptions = results
         
-        // 找出当前学期配置（is_current=true）
-        const currentConfig = results.find(item => item.is_current)
-        if (currentConfig) {
-          this.currentSemesterConfig = currentConfig
-          // 默认选中当前学期
-          this.calcForm.semester_config_id = currentConfig.id
-          console.log('当前学期配置:', currentConfig.name)
-        } else if (results.length > 0) {
-          // 如果没有标记为当前学期的，使用第一个启用的
+        // 使用第一个启用的学期作为当前学期
+        if (results.length > 0) {
           const activeConfig = results.find(item => item.is_active)
           if (activeConfig) {
             this.currentSemesterConfig = activeConfig
-            this.calcForm.semester_config_id = activeConfig.id
-            console.log('使用第一个启用的学期配置:', activeConfig.name)
+            this.calcForm.semester_id = activeConfig.id
+            // 自动更新学年为选中学期的学年
+            this.calcForm.academic_year = activeConfig.academic_year
+            console.log('使用当前学期:', activeConfig.name, '学年:', activeConfig.academic_year)
           }
         }
       } catch (error) {
@@ -728,23 +725,23 @@ export default {
           academic_year: this.calcForm.academic_year
         }
         
-        // 使用选中的学期配置ID（默认是当前学期）
-        if (this.calcForm.semester_config_id) {
-          params.semester_config_id = this.calcForm.semester_config_id
-          console.log('使用学期配置ID:', this.calcForm.semester_config_id)
+        // 使用选中的学期ID（默认是当前学期）
+        if (this.calcForm.semester_id) {
+          params.semester_id = this.calcForm.semester_id
+          console.log('使用学期ID:', this.calcForm.semester_id)
         } else if (this.currentSemesterConfig) {
           // 如果没有选中且存在当前学期配置，使用当前学期
-          params.semester_config_id = this.currentSemesterConfig.id
-          console.log('使用当前学期配置:', this.currentSemesterConfig.name)
+          params.semester_id = this.currentSemesterConfig.id
+          console.log('使用当前学期:', this.currentSemesterConfig.name)
         }
         
         const res = await this.$http.post('/tuition/calculate/', params)
         this.calculationResult = res.data
         
-        // 如果后端返回的学期配置不是当前学期，显示提示
-        if (this.calculationResult.semester_config && 
+        // 如果后端返回的学期不是当前学期，显示提示
+        if (this.calculationResult.semester && 
             this.currentSemesterConfig && 
-            this.calculationResult.semester_config.id !== this.currentSemesterConfig.id) {
+            this.calculationResult.semester.id !== this.currentSemesterConfig.id) {
           this.$message.info('使用的是非当前学期的配置')
         }
         
@@ -765,14 +762,14 @@ export default {
           academic_year: this.calcForm.academic_year
         }
         
-        // 使用选中的学期配置ID（默认是当前学期）
-        if (this.calcForm.semester_config_id) {
-          params.semester_config_id = this.calcForm.semester_config_id
-          console.log('使用学期配置ID:', this.calcForm.semester_config_id)
+        // 使用选中的学期ID（默认是当前学期）
+        if (this.calcForm.semester_id) {
+          params.semester_id = this.calcForm.semester_id
+          console.log('使用学期ID:', this.calcForm.semester_id)
         } else if (this.currentSemesterConfig) {
           // 如果没有选中且存在当前学期配置，使用当前学期
-          params.semester_config_id = this.currentSemesterConfig.id
-          console.log('使用当前学期配置:', this.currentSemesterConfig.name)
+          params.semester_id = this.currentSemesterConfig.id
+          console.log('使用当前学期:', this.currentSemesterConfig.name)
         }
         
         const res = await this.$http.post('/tuition/calculate/', params)
@@ -821,7 +818,7 @@ export default {
 
       try {
         this.emailSending = true
-        this.$message.info('正在发送邮件...')
+        this.$message.info('邮件发送任务已启动，正在发送...')
 
         // 构建FormData
         const formData = new FormData()
@@ -839,14 +836,73 @@ export default {
           }
         })
 
-        this.$message.success('邮件发送成功')
+        // 关闭对话框，开始轮询查询邮件发送状态
         this.emailDialogVisible = false
         this.emailAttachmentList = []
+        this.emailSendingInvoiceNo = this.currentEmailFamily.invoice_no
+        this.startEmailStatusPolling(this.currentEmailFamily.invoice_no)
       } catch (error) {
         console.error('邮件发送失败:', error)
         this.$message.error('邮件发送失败：' + (error.message || '网络错误'))
       } finally {
         this.emailSending = false
+      }
+    },
+
+    // 开始邮件状态轮询
+    startEmailStatusPolling(invoiceNo) {
+      // 清除之前的轮询
+      this.stopEmailStatusPolling()
+
+      // 立即查询一次
+      this.checkEmailStatus(invoiceNo)
+
+      // 每5秒轮询一次
+      this.emailStatusPolling = setInterval(() => {
+        this.checkEmailStatus(invoiceNo)
+      }, 5000)
+    },
+
+    // 停止邮件状态轮询
+    stopEmailStatusPolling() {
+      if (this.emailStatusPolling) {
+        clearInterval(this.emailStatusPolling)
+        this.emailStatusPolling = null
+      }
+      this.emailSendingInvoiceNo = null
+    },
+
+    // 查询邮件发送状态
+    async checkEmailStatus(invoiceNo) {
+      try {
+        const response = await this.$http.post('/tuition/email/', {
+          action: 'get_email_status',
+          invoice_no: invoiceNo
+        })
+
+        // 响应拦截器已经返回了 response.data，直接使用 response
+        const result = response
+        console.log('[邮件状态查询]', result)
+
+        if ((result.code === 1 || result.code === '1') && result.data && result.data.length > 0) {
+          const status = result.data[0]
+          console.log('[邮件状态]', status)
+
+          if (status.email_sent) {
+            // 邮件已成功发送
+            this.$message.success(`邮件发送成功！发送时间：${status.email_sent_at}`)
+            this.stopEmailStatusPolling()
+            // 刷新列表数据（如果需要）
+            this.fetchCalculationResult()
+          } else {
+            console.log('[邮件状态] 尚未发送成功，继续轮询...')
+          }
+        } else {
+          console.log('[邮件状态查询] 响应格式异常:', result)
+        }
+      } catch (error) {
+        console.error('查询邮件状态失败:', error)
+        // 查询失败不停止轮询，继续尝试
       }
     },
 
@@ -870,7 +926,7 @@ export default {
     async submitBatchSendEmail() {
       try {
         this.batchEmailSending = true
-        this.$message.info('正在批量发送邮件...')
+        this.$message.info('批量邮件发送任务已启动，正在后台发送...')
 
         // 构建FormData
         const formData = new FormData()
@@ -888,9 +944,11 @@ export default {
         })
 
         const data = res.data || res
-        this.$message.success(data.message || '批量邮件发送成功')
+        this.$message.success(data.message || '批量邮件发送任务已启动，请稍后刷新页面查看发送状态')
         this.batchEmailDialogVisible = false
         this.batchEmailAttachmentList = []
+        // 刷新列表数据
+        this.fetchCalculationResult()
       } catch (error) {
         console.error('批量邮件发送失败:', error)
         this.$message.error('批量邮件发送失败：' + (error.message || '网络错误'))
@@ -942,7 +1000,7 @@ export default {
         students: [{
           english_name: '',
           student_no: '',
-          class_name: '',
+          grade: '',
           base_tuition: 165000,
           sibling_discount_rate: 0,
           sibling_discount_amount: 0,
@@ -966,7 +1024,7 @@ export default {
       this.manualPdfForm.students.push({
         english_name: '',
         student_no: '',
-        class_name: '',
+        grade: '',
         base_tuition: 165000,
         sibling_discount_rate: 0,
         sibling_discount_amount: 0,
@@ -1000,7 +1058,7 @@ export default {
         // 验证学生信息
         for (let i = 0; i < this.manualPdfForm.students.length; i++) {
           const s = this.manualPdfForm.students[i]
-          if (!s.english_name || !s.student_no || !s.class_name || !s.base_tuition) {
+          if (!s.english_name || !s.student_no || !s.grade || !s.base_tuition) {
             this.$message.error(`学生 ${i + 1} 信息不完整`)
             return
           }
@@ -1115,6 +1173,11 @@ export default {
         this.downloadAllLoading = false
       }
     }
+  },
+
+  beforeDestroy() {
+    // 组件销毁时清除邮件状态轮询定时器
+    this.stopEmailStatusPolling()
   }
 }
 </script>

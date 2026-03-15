@@ -11,6 +11,7 @@
       />
       <el-button type="primary" icon="el-icon-search" @click="getList">查询</el-button>
       <el-button type="success" icon="el-icon-plus" @click="handleCreate">新增校历</el-button>
+      <el-button type="warning" icon="el-icon-upload" @click="handleImport">导入校历</el-button>
     </div>
 
     <!-- 数据表格 -->
@@ -28,39 +29,46 @@
         <template slot-scope="scope">
           <div style="padding: 10px; background: #f5f7fa;">
             <div style="margin-bottom: 10px; font-weight: bold; color: #606266;">
-              <i class="el-icon-date" /> {{ scope.row.academic_year }} 月度明细
-              <el-button type="primary" size="mini" icon="el-icon-plus" style="margin-left: 10px;" @click="handleAddMonth(scope.row)">新增月份</el-button>
-              <el-button type="success" size="mini" icon="el-icon-refresh" style="margin-left: 5px;" @click="handleGenerateMonths(scope.row)">自动生成</el-button>
+              <i class="el-icon-date" /> {{ scope.row.name }} 到校日历
             </div>
-            <el-table :data="scope.row.months || []" border size="small" style="width: 100%;">
-              <el-table-column label="月份" align="center" width="80">
-                <template slot-scope="monthScope">
-                  {{ formatYearMonth(monthScope.row) }}
-                </template>
-              </el-table-column>
-              <el-table-column label="工作日天数" align="center" width="100">
-                <template slot-scope="monthScope">
-                  <span style="font-weight: bold; color: #409eff;">{{ monthScope.row.working_days_in_month }}</span><span style="color: #909399; margin-left: 3px;">天</span>
-                </template>
-              </el-table-column>
-              <el-table-column label="备注" prop="remark" align="center" show-overflow-tooltip />
-              <el-table-column label="操作" align="center" width="120">
-                <template slot-scope="monthScope">
-                  <el-button type="primary" size="mini" icon="el-icon-edit" @click="handleEditMonth(scope.row, monthScope.row)" />
-                  <el-button type="danger" size="mini" icon="el-icon-delete" @click="handleDeleteMonth(scope.row, monthScope.row)" />
-                </template>
-              </el-table-column>
-            </el-table>
+            <!-- 日历视图 -->
+            <div class="calendar-view">
+              <div v-for="(month, monthIndex) in getCalendarMonths(scope.row)" :key="monthIndex" class="calendar-month">
+                <div class="month-title">{{ month.year }}年{{ month.month }}月</div>
+                <div class="week-header">
+                  <span v-for="day in ['日', '一', '二', '三', '四', '五', '六']" :key="day" class="week-day">{{ day }}</span>
+                </div>
+                <div class="days-grid">
+                  <div 
+                    v-for="(day, dayIndex) in month.days" 
+                    :key="dayIndex"
+                    :class="['day-cell', getDayClass(day), { 'clickable': day }]"
+                    @click="day && handleDayClick(scope.row, day)"
+                  >
+                    <template v-if="day">
+                      <div class="day-number">{{ day.date.getDate() }}</div>
+                      <div v-if="day.is_teaching_day" class="day-tag teaching">到校</div>
+                      <div v-else-if="day.is_weekend" class="day-tag weekend">休</div>
+                      <div v-else class="day-tag non-teaching">假</div>
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </template>
       </el-table-column>
       <el-table-column label="ID" prop="id" align="center" width="60" />
       <el-table-column label="学年" prop="academic_year" align="center" width="120" />
-      <el-table-column label="学年开始日期" prop="year_start_date" align="center" width="130" />
-      <el-table-column label="学年结束日期" prop="year_end_date" align="center" width="130" />
-      <el-table-column label="总教学日" prop="total_teaching_days" align="center" width="100" />
-      <el-table-column label="第一学期教学日" prop="first_semester_teaching_days" align="center" width="120" />
-      <el-table-column label="第二学期教学日" prop="second_semester_teaching_days" align="center" width="120" />
+      <el-table-column label="学期" align="center" width="120">
+        <template slot-scope="scope">
+          {{ formatSemesterType(scope.row.semester) }}
+        </template>
+      </el-table-column>
+      <el-table-column label="学期名称" prop="name" align="center" min-width="200" show-overflow-tooltip />
+      <el-table-column label="开始日期" prop="start_date" align="center" width="120" />
+      <el-table-column label="结束日期" prop="end_date" align="center" width="120" />
+      <el-table-column label="总到校日" prop="total_teaching_days" align="center" width="100" />
       <el-table-column label="状态" align="center" width="80">
         <template slot-scope="scope">
           <el-tag v-if="scope.row.is_active" type="success">启用</el-tag>
@@ -80,17 +88,27 @@
       共 {{ total }} 条记录
     </div>
 
-    <!-- 新增/编辑校历对话框 -->
+    <!-- 新增/编辑学期对话框 -->
     <el-dialog :title="dialogTitle" :visible.sync="dialogVisible" width="600px">
-      <el-form ref="dataForm" :model="form" :rules="rules" label-width="140px">
+      <el-form ref="dataForm" :model="form" :rules="rules" label-width="120px">
+        <el-form-item label="学期名称" prop="name">
+          <el-input v-model="form.name" placeholder="如：2026-2027 第一学期" />
+        </el-form-item>
         <el-form-item label="学年" prop="academic_year">
-          <el-input v-model="form.academic_year" placeholder="如：2025-2026" />
+          <el-input v-model="form.academic_year" placeholder="如：2026-2027" />
+        </el-form-item>
+        <el-form-item label="学期类型" prop="semester">
+          <el-select v-model="form.semester" placeholder="选择学期类型" style="width: 100%;">
+            <el-option label="第一学期" value="First" />
+            <el-option label="第二学期" value="Second" />
+            <el-option label="暑期学期" value="Summer" />
+          </el-select>
         </el-form-item>
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="学年开始日期" prop="year_start_date">
+            <el-form-item label="开始日期" prop="start_date">
               <el-date-picker
-                v-model="form.year_start_date"
+                v-model="form.start_date"
                 type="date"
                 placeholder="选择日期"
                 style="width: 100%;"
@@ -99,9 +117,9 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="学年结束日期" prop="year_end_date">
+            <el-form-item label="结束日期" prop="end_date">
               <el-date-picker
-                v-model="form.year_end_date"
+                v-model="form.end_date"
                 type="date"
                 placeholder="选择日期"
                 style="width: 100%;"
@@ -110,26 +128,9 @@
             </el-form-item>
           </el-col>
         </el-row>
-        <el-divider content-position="left">教学日统计</el-divider>
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="总教学日">
-              <el-input-number v-model="form.total_teaching_days" :min="0" :precision="0" style="width: 100%;" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="第一学期教学日">
-              <el-input-number v-model="form.first_semester_teaching_days" :min="0" :precision="0" style="width: 100%;" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="第二学期教学日">
-              <el-input-number v-model="form.second_semester_teaching_days" :min="0" :precision="0" style="width: 100%;" />
-            </el-form-item>
-          </el-col>
-        </el-row>
+        <el-form-item label="总到校日">
+          <el-input-number v-model="form.total_teaching_days" :min="0" :precision="0" style="width: 100%;" />
+        </el-form-item>
         <el-form-item label="启用状态">
           <el-switch v-model="form.is_active" active-text="启用" inactive-text="禁用" />
         </el-form-item>
@@ -140,34 +141,77 @@
       </div>
     </el-dialog>
 
-    <!-- 新增/编辑月度明细对话框 -->
-    <el-dialog :title="monthDialogTitle" :visible.sync="monthDialogVisible" width="450px">
-      <el-form ref="monthForm" :model="monthForm" :rules="monthRules" label-width="100px">
-        <el-form-item label="所属校历">
-          <el-input :value="currentCalendarAcademicYear" disabled style="width: 100%;" />
+    <!-- 导入校历对话框 -->
+    <el-dialog title="导入校历Excel" :visible.sync="importDialogVisible" width="550px">
+      <el-form ref="importForm" :model="importForm" :rules="importRules" label-width="120px">
+        <el-form-item label="Excel文件" prop="file">
+          <el-upload
+            ref="upload"
+            class="upload-demo"
+            action=""
+            :auto-upload="false"
+            :on-change="handleFileChange"
+            :on-remove="handleFileRemove"
+            :limit="1"
+            accept=".xlsx,.xls"
+          >
+            <el-button size="small" type="primary">选择文件</el-button>
+            <div slot="tip" class="el-upload__tip">只能上传 Excel 文件(.xlsx/.xls)</div>
+          </el-upload>
         </el-form-item>
-        <el-form-item label="年月" prop="yearMonth">
-          <el-date-picker
-            v-model="monthForm.yearMonth"
-            type="month"
-            placeholder="选择年月"
-            style="width: 100%;"
-            value-format="yyyy-MM"
-            @change="handleYearMonthChange"
-          />
+        <el-form-item label="学年" prop="academic_year">
+          <el-input v-model="importForm.academic_year" placeholder="如：2026-2027" />
         </el-form-item>
-        <el-form-item label="工作日天数" prop="working_days_in_month">
-          <el-slider v-model="monthForm.working_days_in_month" :max="31" show-input style="width: 100%;" />
+        <el-form-item label="学期类型" prop="semester_type">
+          <el-select v-model="importForm.semester_type" placeholder="选择学期" style="width: 100%;">
+            <el-option label="第一学期" value="First" />
+            <el-option label="第二学期" value="Second" />
+            <el-option label="暑期学期" value="Summer" />
+          </el-select>
         </el-form-item>
-        <el-form-item label="备注">
-          <el-input v-model="monthForm.remark" type="textarea" :rows="2" placeholder="可选，记录节假日等特殊情况" />
-        </el-form-item>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="开始日期" prop="start_date">
+              <el-date-picker
+                v-model="importForm.start_date"
+                type="date"
+                placeholder="选择日期"
+                style="width: 100%;"
+                value-format="yyyy-MM-dd"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="结束日期" prop="end_date">
+              <el-date-picker
+                v-model="importForm.end_date"
+                type="date"
+                placeholder="选择日期"
+                style="width: 100%;"
+                value-format="yyyy-MM-dd"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
       </el-form>
+      <div v-if="importResult" class="import-result">
+        <el-divider content-position="left">导入结果</el-divider>
+        <el-descriptions :column="2" border size="small">
+          <el-descriptions-item label="学年">{{ importResult.academic_year }}</el-descriptions-item>
+          <el-descriptions-item label="学期">{{ importResult.semester.type_display }}</el-descriptions-item>
+          <el-descriptions-item label="到校日">{{ importResult.import_result.teaching_days }} 天</el-descriptions-item>
+          <el-descriptions-item label="周末">{{ importResult.import_result.weekend_days }} 天</el-descriptions-item>
+          <el-descriptions-item label="非到校日">{{ importResult.import_result.non_teaching_days }} 天</el-descriptions-item>
+          <el-descriptions-item label="导入天数">{{ importResult.import_result.imported_days }} 天</el-descriptions-item>
+        </el-descriptions>
+      </div>
       <div slot="footer" class="dialog-footer">
-        <el-button @click="monthDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="submitMonthForm">确定</el-button>
+        <el-button @click="importDialogVisible = false">关闭</el-button>
+        <el-button type="primary" :loading="importLoading" @click="submitImport">开始导入</el-button>
       </div>
     </el-dialog>
+
+
   </div>
 </template>
 
@@ -188,43 +232,38 @@ export default {
       dialogTitle: '',
       form: {
         id: null,
+        name: '',
         academic_year: '',
-        year_start_date: '',
-        year_end_date: '',
+        semester: '',
+        start_date: '',
+        end_date: '',
         total_teaching_days: 0,
-        first_semester_teaching_days: 0,
-        second_semester_teaching_days: 0,
         is_active: true
       },
       rules: {
+        name: [{ required: true, message: '请输入学期名称', trigger: 'blur' }],
         academic_year: [{ required: true, message: '请输入学年', trigger: 'blur' }],
-        year_start_date: [{ required: true, message: '请选择开始日期', trigger: 'change' }],
-        year_end_date: [{ required: true, message: '请选择结束日期', trigger: 'change' }]
+        semester: [{ required: true, message: '请选择学期类型', trigger: 'change' }],
+        start_date: [{ required: true, message: '请选择开始日期', trigger: 'change' }],
+        end_date: [{ required: true, message: '请选择结束日期', trigger: 'change' }]
       },
-      // 月度明细相关
-      currentCalendar: null,
-      monthDialogVisible: false,
-      monthDialogTitle: '',
-      monthForm: {
-        id: null,
-        school_calendar: null,
-        month: null,
-        yearMonth: '',
-        month_start_date: '',
-        month_end_date: '',
-        working_days_in_month: 22,
-        remark: ''
+      // 导入校历相关
+      importDialogVisible: false,
+      importLoading: false,
+      importForm: {
+        file: null,
+        academic_year: '',
+        semester_type: '',
+        start_date: '',
+        end_date: ''
       },
-      monthRules: {
-        yearMonth: [{ required: true, message: '请选择年月', trigger: 'change' }],
-        working_days_in_month: [{ required: true, message: '请输入工作日天数', trigger: 'blur' }]
-      }
-    }
-  },
-  computed: {
-    // 当前校历的学年名称
-    currentCalendarAcademicYear() {
-      return this.currentCalendar ? this.currentCalendar.academic_year : ''
+      importRules: {
+        academic_year: [{ required: true, message: '请输入学年', trigger: 'blur' }],
+        semester_type: [{ required: true, message: '请选择学期类型', trigger: 'change' }],
+        start_date: [{ required: true, message: '请选择开始日期', trigger: 'change' }],
+        end_date: [{ required: true, message: '请选择结束日期', trigger: 'change' }]
+      },
+      importResult: null
     }
   },
   created() {
@@ -244,7 +283,7 @@ export default {
       this.monthTableHeight = window.innerHeight - 350
     },
 
-    // 获取校历列表
+    // 获取学期列表
     async getList() {
       this.listLoading = true
       try {
@@ -252,7 +291,7 @@ export default {
         if (this.listQuery.academic_year) {
           params.academic_year = this.listQuery.academic_year
         }
-        const res = await this.$http.get('/schoolcalendar/', { params })
+        const res = await this.$http.get('/semester/', { params })
 
         let dataList = []
         if (Array.isArray(res)) {
@@ -266,103 +305,246 @@ export default {
         this.list = dataList
         this.total = dataList.length
 
-        // 默认展开启用的校历
+        // 默认展开启用的学期
         this.$nextTick(() => {
-          this.expandActiveCalendar()
+          this.expandActiveSemester()
         })
       } catch (error) {
-        console.error('获取校历列表失败:', error)
-        this.$message.error('获取校历列表失败')
+        console.error('获取学期列表失败:', error)
+        this.$message.error('获取学期列表失败')
       } finally {
         this.listLoading = false
       }
     },
 
-    // 展开行时加载月度明细
+    // 展开行时加载每日校历明细
     async handleExpandChange(row, expandedRows) {
-      if (expandedRows.includes(row) && (!row.months || row.months.length === 0)) {
-        await this.loadMonths(row)
+      if (expandedRows.includes(row) && (!row.calendar_days || row.calendar_days.length === 0)) {
+        await this.loadCalendarDays(row)
       }
     },
 
-    // 默认展开启用的校历
-    async expandActiveCalendar() {
-      // 找到启用的校历
-      const activeCalendar = this.list.find(c => c.is_active)
-      if (activeCalendar) {
-        // 加载月度明细
-        await this.loadMonths(activeCalendar)
+    // 默认展开启用的学期
+    async expandActiveSemester() {
+      // 找到启用的学期
+      const activeSemester = this.list.find(s => s.is_active)
+      if (activeSemester) {
+        // 加载每日校历
+        await this.loadCalendarDays(activeSemester)
         // 触发展开（通过设置表格的展开行）
         this.$nextTick(() => {
           const table = this.$refs.calendarTable
           if (table) {
-            table.toggleRowExpansion(activeCalendar, true)
+            table.toggleRowExpansion(activeSemester, true)
           }
         })
       }
     },
 
-    // 加载月度明细
-    async loadMonths(calendar) {
+    // 加载每日校历明细
+    async loadCalendarDays(semester) {
       try {
-        const res = await this.$http.get('/schoolcalendarmonth/', {
-          params: { school_calendar: calendar.id }
+        const res = await this.$http.get('/schoolcalendar/', {
+          params: { semester_id: semester.id }
         })
 
-        let months = []
+        let days = []
         if (Array.isArray(res)) {
-          months = res
+          days = res
         } else if (res.results && Array.isArray(res.results)) {
-          months = res.results
+          days = res.results
         } else if (res.data && Array.isArray(res.data)) {
-          months = res.data
+          days = res.data
         }
 
-        this.$set(calendar, 'months', months.sort((a, b) => a.month - b.month))
+        this.$set(semester, 'calendar_days', days)
       } catch (error) {
-        console.error('加载月度明细失败:', error)
-        this.$message.error('加载月度明细失败')
+        console.error('加载每日校历失败:', error)
+        this.$message.error('加载每日校历失败')
       }
     },
 
-    // 格式化年月显示 (根据学年逻辑: 8-12月用第一年份, 1-7月用第二年份)
-    formatYearMonth(row) {
-      const month = row.month
-      if (!month) return '-'
+    // 格式化学期类型显示
+    formatSemesterType(type) {
+      const typeMap = {
+        'First': '第一学期',
+        'Second': '第二学期',
+        'Summer': '暑期学期'
+      }
+      return typeMap[type] || type
+    },
 
-      // 找到对应的校历
-      const calendar = this.list.find(c => c.id === row.school_calendar)
-      if (!calendar) return `${month}月`
+    // 获取日历月份数据
+    getCalendarMonths(semester) {
+      if (!semester.calendar_days || semester.calendar_days.length === 0) {
+        return []
+      }
 
-      // 解析学年 2026-2027
-      const yearParts = calendar.academic_year.split('-')
-      const firstYear = parseInt(yearParts[0]) // 2026
-      const secondYear = yearParts[1] ? parseInt(yearParts[1]) : firstYear + 1 // 2027
+      const days = semester.calendar_days
+      const monthsMap = new Map()
 
-      // 判断月份属于哪个年份
-      // 8-12月属于第一学年（如2026）
-      // 1-7月属于第二学年（如2027）
-      let year
-      if (month >= 8) {
-        year = firstYear
+      days.forEach(day => {
+        const date = new Date(day.date)
+        const year = date.getFullYear()
+        const month = date.getMonth() + 1
+        const key = `${year}-${month}`
+
+        if (!monthsMap.has(key)) {
+          monthsMap.set(key, {
+            year,
+            month,
+            days: []
+          })
+        }
+
+        monthsMap.get(key).days.push({
+          id: day.id,
+          date,
+          is_teaching_day: day.is_teaching_day,
+          is_weekend: day.note === 'Weekend',
+          is_semester_start: day.is_semester_start,
+          is_semester_end: day.is_semester_end,
+          note: day.note
+        })
+      })
+
+      // 为每个月填充空白天数，使其成为完整的日历网格
+      const result = []
+      monthsMap.forEach(monthData => {
+        const firstDay = monthData.days[0].date
+        const firstDayOfWeek = firstDay.getDay() // 0=周日, 1=周一...
+        
+        // 在前面填充空白天数
+        const paddedDays = []
+        for (let i = 0; i < firstDayOfWeek; i++) {
+          paddedDays.push(null)
+        }
+        
+        // 填充该月的所有天数
+        paddedDays.push(...monthData.days)
+        
+        // 补全到35个格子（5行）或42个格子（6行）
+        const totalCells = paddedDays.length <= 35 ? 35 : 42
+        while (paddedDays.length < totalCells) {
+          paddedDays.push(null)
+        }
+
+        result.push({
+          year: monthData.year,
+          month: monthData.month,
+          days: paddedDays
+        })
+      })
+
+      // 按年月排序
+      return result.sort((a, b) => {
+        if (a.year !== b.year) return a.year - b.year
+        return a.month - b.month
+      })
+    },
+
+    // 获取日期单元格的样式类
+    getDayClass(day) {
+      if (!day) return 'empty'
+      const classes = []
+      if (day.is_teaching_day) {
+        classes.push('teaching-day')
+      } else if (day.is_weekend) {
+        classes.push('weekend-day')
       } else {
-        year = secondYear
+        classes.push('non-teaching-day')
       }
-
-      return `${year % 100}.${month}`
+      if (day.is_semester_start || day.is_semester_end) {
+        classes.push('semester-edge')
+      }
+      return classes.join(' ')
     },
 
-    // 新增校历
+    // 点击日期切换到校日状态
+    async handleDayClick(semester, day) {
+      // 周末不能修改
+      if (day.is_weekend) {
+        this.$message.info('周末不能修改为到校日')
+        return
+      }
+
+      try {
+        const newStatus = !day.is_teaching_day
+        const actionText = newStatus ? '设为到校日' : '设为非到校日'
+        
+        await this.$confirm(`确认将该日期${actionText}？`, '提示', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        })
+
+        // 调用API更新
+        const res = await this.$http.patch(`/schoolcalendar/${day.id}/`, {
+          is_teaching_day: newStatus
+        })
+
+        // 更新本地数据
+        day.is_teaching_day = newStatus
+        
+        // 更新原始 calendar_days 数据中的对应项
+        const calendarDay = semester.calendar_days.find(d => d.id === day.id)
+        if (calendarDay) {
+          calendarDay.is_teaching_day = newStatus
+        }
+        
+        // 使用后端返回的 semester_total_teaching_days 更新总到校日
+        if (res && res.semester_total_teaching_days !== undefined) {
+          this.updateSemesterTeachingDays(semester, res.semester_total_teaching_days)
+        } else {
+          // 如果后端没有返回，则本地计算
+          this.recalculateTeachingDays(semester)
+        }
+
+        this.$message.success('更新成功')
+      } catch (error) {
+        if (error !== 'cancel') {
+          console.error('更新失败:', error)
+          this.$message.error('更新失败')
+        }
+      }
+    },
+
+    // 使用后端返回的总到校日数更新学期数据
+    updateSemesterTeachingDays(semester, totalDays) {
+      semester.total_teaching_days = totalDays
+      
+      // 强制更新列表中的学期数据
+      const index = this.list.findIndex(s => s.id === semester.id)
+      if (index !== -1) {
+        this.$set(this.list[index], 'total_teaching_days', totalDays)
+      }
+    },
+
+    // 重新计算学期的总到校日数（本地计算备用）
+    recalculateTeachingDays(semester) {
+      if (!semester.calendar_days) return
+      
+      const teachingDays = semester.calendar_days.filter(day => day.is_teaching_day).length
+      semester.total_teaching_days = teachingDays
+      
+      // 强制更新列表中的学期数据
+      const index = this.list.findIndex(s => s.id === semester.id)
+      if (index !== -1) {
+        this.$set(this.list[index], 'total_teaching_days', teachingDays)
+      }
+    },
+
+    // 新增学期
     handleCreate() {
-      this.dialogTitle = '新增校历'
+      this.dialogTitle = '新增学期'
       this.form = {
         id: null,
+        name: '',
         academic_year: '',
-        year_start_date: '',
-        year_end_date: '',
+        semester: '',
+        start_date: '',
+        end_date: '',
         total_teaching_days: 0,
-        first_semester_teaching_days: 0,
-        second_semester_teaching_days: 0,
         is_active: true
       }
       this.dialogVisible = true
@@ -371,9 +553,9 @@ export default {
       })
     },
 
-    // 编辑校历
+    // 编辑学期
     handleUpdate(row) {
-      this.dialogTitle = '编辑校历'
+      this.dialogTitle = '编辑学期'
       this.form = { ...row }
       this.dialogVisible = true
       this.$nextTick(() => {
@@ -381,15 +563,15 @@ export default {
       })
     },
 
-    // 删除校历
+    // 删除学期
     async handleDelete(row) {
       try {
-        await this.$confirm('确认删除该校历？删除后相关的月度明细也会被删除。', '提示', {
+        await this.$confirm('确认删除该学期？删除后相关的每日校历数据也会被删除。', '提示', {
           confirmButtonText: '确定',
           cancelButtonText: '取消',
           type: 'warning'
         })
-        await this.$http.delete(`/schoolcalendar/${row.id}/`)
+        await this.$http.delete(`/semester/${row.id}/`)
         this.$message.success('删除成功')
         this.getList()
       } catch (error) {
@@ -399,16 +581,16 @@ export default {
       }
     },
 
-    // 提交校历表单
+    // 提交学期表单
     submitForm() {
       this.$refs.dataForm.validate(async(valid) => {
         if (valid) {
           try {
             if (this.form.id) {
-              await this.$http.put(`/schoolcalendar/${this.form.id}/`, this.form)
+              await this.$http.put(`/semester/${this.form.id}/`, this.form)
               this.$message.success('更新成功')
             } else {
-              await this.$http.post('/schoolcalendar/', this.form)
+              await this.$http.post('/semester/', this.form)
               this.$message.success('创建成功')
             }
             this.dialogVisible = false
@@ -421,154 +603,86 @@ export default {
       })
     },
 
-    // 年月选择变化
-    handleYearMonthChange(val) {
-      if (val) {
-        const [year, month] = val.split('-')
-        this.monthForm.month = parseInt(month)
-        // 直接拼接日期字符串，避免时区问题
-        const lastDayOfMonth = new Date(year, month, 0).getDate()
-        this.monthForm.month_start_date = `${year}-${month}-01`
-        this.monthForm.month_end_date = `${year}-${month}-${lastDayOfMonth}`
+    // 打开导入校历对话框
+    handleImport() {
+      this.importDialogVisible = true
+      this.importResult = null
+      this.importForm = {
+        file: null,
+        academic_year: '',
+        semester_type: '',
+        start_date: '',
+        end_date: ''
       }
-    },
-
-    // 新增月份
-    handleAddMonth(calendar) {
-      this.currentCalendar = calendar
-      this.monthDialogTitle = `新增 ${calendar.academic_year} 月度明细`
-      // 默认当前年月
-      const now = new Date()
-      const year = now.getFullYear()
-      const month = now.getMonth() + 1
-      const yearMonth = `${year}-${String(month).padStart(2, '0')}`
-      const lastDay = new Date(year, month, 0).getDate()
-
-      this.monthForm = {
-        id: null,
-        school_calendar: calendar.id,
-        month: month,
-        yearMonth: yearMonth,
-        month_start_date: `${year}-${String(month).padStart(2, '0')}-01`,
-        month_end_date: `${year}-${String(month).padStart(2, '0')}-${lastDay}`,
-        working_days_in_month: 22,
-        remark: ''
-      }
-      this.monthDialogVisible = true
       this.$nextTick(() => {
-        this.$refs.monthForm && this.$refs.monthForm.clearValidate()
+        this.$refs.importForm && this.$refs.importForm.clearValidate()
+        this.$refs.upload && this.$refs.upload.clearFiles()
       })
     },
 
-    // 编辑月份
-    handleEditMonth(calendar, monthRow) {
-      this.currentCalendar = calendar
-      this.monthDialogTitle = `编辑 ${calendar.academic_year} ${monthRow.month}月`
-      // 从 month_start_date 解析年月
-      let yearMonth = ''
-      if (monthRow.month_start_date) {
-        yearMonth = monthRow.month_start_date.substring(0, 7)
-      }
-
-      this.monthForm = {
-        ...monthRow,
-        yearMonth: yearMonth
-      }
-      this.monthDialogVisible = true
-      this.$nextTick(() => {
-        this.$refs.monthForm && this.$refs.monthForm.clearValidate()
-      })
+    // 文件选择变化
+    handleFileChange(file) {
+      this.importForm.file = file.raw
     },
 
-    // 删除月份
-    async handleDeleteMonth(calendar, monthRow) {
-      const monthLabel = this.formatYearMonth(monthRow)
-      try {
-        await this.$confirm(`确认删除 ${monthLabel} 的明细？`, '提示', {
-          confirmButtonText: '确定',
-          cancelButtonText: '取消',
-          type: 'warning'
-        })
-        await this.$http.delete(`/schoolcalendarmonth/${monthRow.id}/`)
-        this.$message.success('删除成功')
-        this.loadMonths(calendar)
-      } catch (error) {
-        if (error !== 'cancel') {
-          this.$message.error('删除失败')
+    // 文件移除
+    handleFileRemove() {
+      this.importForm.file = null
+    },
+
+    // 提交导入
+    submitImport() {
+      this.$refs.importForm.validate(async(valid) => {
+        if (!valid) return
+
+        if (!this.importForm.file) {
+          this.$message.warning('请选择Excel文件')
+          return
         }
-      }
-    },
 
-    // 提交月份表单
-    submitMonthForm() {
-      this.$refs.monthForm.validate(async(valid) => {
-        if (valid) {
-          try {
-            // 移除 yearMonth 字段，只提交后端需要的字段
-            const submitData = {
-              school_calendar: this.monthForm.school_calendar,
-              month: this.monthForm.month,
-              month_start_date: this.monthForm.month_start_date,
-              month_end_date: this.monthForm.month_end_date,
-              working_days_in_month: this.monthForm.working_days_in_month,
-              remark: this.monthForm.remark || ''
-            }
+        this.importLoading = true
+        this.importResult = null
 
-            if (this.monthForm.id) {
-              await this.$http.put(`/schoolcalendarmonth/${this.monthForm.id}/`, submitData)
-              this.$message.success('更新成功')
-            } else {
-              await this.$http.post('/schoolcalendarmonth/', submitData)
-              this.$message.success('创建成功')
+        try {
+          // 创建FormData
+          const formData = new FormData()
+          formData.append('file', this.importForm.file)
+          formData.append('academic_year', this.importForm.academic_year)
+          formData.append('semester_type', this.importForm.semester_type)
+          formData.append('start_date', this.importForm.start_date)
+          formData.append('end_date', this.importForm.end_date)
+
+          // 调用导入接口
+          const res = await this.$http.post('/calendar-import/import-semester/', formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data'
             }
-            this.monthDialogVisible = false
-            this.loadMonths(this.currentCalendar)
-          } catch (error) {
-            console.error('保存失败:', error)
-            let errorMsg = '保存失败'
-            if (error.response && error.response.data) {
-              const errorData = error.response.data
-              if (errorData.non_field_errors) {
-                errorMsg = errorData.non_field_errors.join(', ')
-              } else if (errorData.month) {
-                errorMsg = `月份错误: ${errorData.month.join(', ')}`
-              } else {
-                const firstKey = Object.keys(errorData)[0]
-                if (firstKey && Array.isArray(errorData[firstKey])) {
-                  errorMsg = `${firstKey}: ${errorData[firstKey].join(', ')}`
-                }
-              }
-            }
-            this.$message.error(errorMsg)
+          })
+
+          if (res.code === 1) {
+            this.importResult = res.data
+            this.$message.success(res.message || '导入成功')
+            // 刷新列表
+            this.getList()
+          } else {
+            this.$message.error(res.message || '导入失败')
           }
+        } catch (error) {
+          console.error('导入失败:', error)
+          let errorMsg = '导入失败'
+          if (error.response && error.response.data) {
+            const errorData = error.response.data
+            if (errorData.error) {
+              errorMsg = errorData.error
+            } else if (errorData.message) {
+              errorMsg = errorData.message
+            }
+          }
+          this.$message.error(errorMsg)
+        } finally {
+          this.importLoading = false
         }
       })
-    },
-
-    // 自动生成月度明细
-    async handleGenerateMonths(calendar) {
-      try {
-        await this.$confirm('将根据学年起止日期自动生成月度明细，是否继续？', '提示', {
-          confirmButtonText: '确定',
-          cancelButtonText: '取消',
-          type: 'info'
-        })
-
-        const res = await this.$http.post(`/schoolcalendar/${calendar.id}/generate_months/`)
-        if (res.code === 1 || res.success) {
-          this.$message.success('生成成功')
-          this.loadMonths(calendar)
-          // 刷新校历数据以更新统计
-          this.getList()
-        } else {
-          this.$message.error(res.message || '生成失败')
-        }
-      } catch (error) {
-        if (error !== 'cancel') {
-          console.error('生成月度明细失败:', error)
-          this.$message.error('生成失败')
-        }
-      }
     }
   }
 }
@@ -580,5 +694,124 @@ export default {
   .filter-item {
     margin-right: 10px;
   }
+}
+.import-result {
+  margin-top: 10px;
+  padding: 10px;
+  background: #f5f7fa;
+  border-radius: 4px;
+}
+
+// 日历视图样式
+.calendar-view {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: flex-start;
+}
+.calendar-month {
+  background: #fff;
+  border-radius: 8px;
+  padding: 15px;
+  box-shadow: 0 2px 12px 0 rgba(0,0,0,0.1);
+  width: 320px;
+}
+.month-title {
+  text-align: center;
+  font-size: 16px;
+  font-weight: bold;
+  color: #303133;
+  margin-bottom: 10px;
+}
+.week-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  margin-bottom: 5px;
+}
+.week-day {
+  font-size: 12px;
+  color: #909399;
+  padding: 5px;
+}
+.days-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.day-cell {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-size: 12px;
+  position: relative;
+  min-height: 36px;
+}
+.day-cell.empty {
+  background: transparent;
+}
+.day-cell.clickable {
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.day-cell.clickable:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.day-number {
+  font-weight: 500;
+}
+.day-tag {
+  font-size: 10px;
+  margin-top: 2px;
+  padding: 0 3px;
+  border-radius: 2px;
+}
+
+// 到校日样式 - 绿色
+.teaching-day {
+  background-color: #f0f9eb;
+  border: 1px solid #b3e19d;
+  .day-number {
+    color: #67c23a;
+  }
+  .day-tag.teaching {
+    background-color: #67c23a;
+    color: #fff;
+  }
+}
+
+// 周末样式 - 灰色
+.weekend-day {
+  background-color: #f4f4f5;
+  border: 1px solid #d3d3d3;
+  .day-number {
+    color: #909399;
+  }
+  .day-tag.weekend {
+    background-color: #909399;
+    color: #fff;
+  }
+}
+
+// 非到校日样式 - 橙色
+.non-teaching-day {
+  background-color: #fdf6ec;
+  border: 1px solid #f5dab1;
+  .day-number {
+    color: #e6a23c;
+  }
+  .day-tag.non-teaching {
+    background-color: #e6a23c;
+    color: #fff;
+  }
+}
+
+// 学期开始/结束标记
+.semester-edge {
+  box-shadow: 0 0 0 2px #409eff;
 }
 </style>
