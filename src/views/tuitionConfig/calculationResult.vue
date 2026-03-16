@@ -96,16 +96,16 @@
           </el-descriptions-item>
         </el-descriptions>
 
-        <div style="margin-bottom: 10px;">
+        <div style="margin-bottom: 10px; display: flex; align-items: center; gap: 15px;">
           <el-checkbox v-model="isSelectAll" @change="handleSelectAll">全选</el-checkbox>
-          <el-button type="text" size="small" @click="selectedFamilies = []">清空选择</el-button>
+          <el-button v-if="selectedFamilies.length > 0" type="text" size="small" style="color: #f56c6c;" @click="handleClearSelection">清空选择({{ selectedFamilies.length }})</el-button>
         </div>
         <el-collapse v-model="activeNames">
           <el-collapse-item v-for="(family, index) in calculationResult.families" :key="index" :name="index">
             <template slot="title">
               <div style="width: 100%; display: flex; justify-content: space-between; padding-right: 20px; align-items: center;">
                 <span style="display: flex; align-items: center;">
-                  <el-checkbox v-model="family.isSelected" style="margin-right: 10px;" @change="handleFamilySelect(family)" @click.native.stop />
+                  <el-checkbox v-model="family.isSelected" style="margin-right: 10px;" @change="handleFamilySelect(family, index)" @click.native.stop />
                   <i class="el-icon-house" style="margin-right: 10px;" />
                   家庭：{{ family.invoice_no }}
                   <el-tag size="small" style="margin-left: 10px;">{{ family.student_count }}名学生</el-tag>
@@ -1212,15 +1212,18 @@ export default {
     },
 
     // 处理家庭选择
-    handleFamilySelect(family) {
+    handleFamilySelect(family, index) {
+      // 使用 Vue.set 确保响应式更新
+      this.$set(this.calculationResult.families[index], 'isSelected', family.isSelected)
+      
       if (family.isSelected) {
         if (!this.selectedFamilies.find(f => f.invoice_no === family.invoice_no)) {
           this.selectedFamilies.push(family)
         }
       } else {
-        const index = this.selectedFamilies.findIndex(f => f.invoice_no === family.invoice_no)
-        if (index > -1) {
-          this.selectedFamilies.splice(index, 1)
+        const idx = this.selectedFamilies.findIndex(f => f.invoice_no === family.invoice_no)
+        if (idx > -1) {
+          this.selectedFamilies.splice(idx, 1)
         }
       }
       this.isSelectAll = this.selectedFamilies.length === (this.calculationResult?.families?.length || 0)
@@ -1229,14 +1232,25 @@ export default {
     // 全选/取消全选
     handleSelectAll(val) {
       if (this.calculationResult?.families) {
-        this.calculationResult.families.forEach(family => {
-          family.isSelected = val
+        this.calculationResult.families.forEach((family, index) => {
+          this.$set(this.calculationResult.families[index], 'isSelected', val)
         })
         if (val) {
           this.selectedFamilies = [...this.calculationResult.families]
         } else {
           this.selectedFamilies = []
         }
+      }
+    },
+
+    // 清空选择
+    handleClearSelection() {
+      this.selectedFamilies = []
+      this.isSelectAll = false
+      if (this.calculationResult?.families) {
+        this.calculationResult.families.forEach((family, index) => {
+          this.$set(this.calculationResult.families[index], 'isSelected', false)
+        })
       }
     },
 
@@ -1361,6 +1375,16 @@ export default {
           msg += `，${totalFailed} 个失败`
         }
         this.$message.success(msg)
+
+        // 下载完成后清空选择（不刷新页面）
+        this.selectedFamilies = []
+        this.isSelectAll = false
+        if (this.calculationResult?.families) {
+          // 使用 Vue.set 确保响应式更新
+          this.calculationResult.families.forEach((family, index) => {
+            this.$set(this.calculationResult.families[index], 'isSelected', false)
+          })
+        }
       } catch (error) {
         if (error === 'cancel') {
           return

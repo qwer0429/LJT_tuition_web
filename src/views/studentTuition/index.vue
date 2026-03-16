@@ -91,6 +91,7 @@
     <!-- 数据表格 -->
     <el-card class="table-container" shadow="never" style="margin-top: 15px;">
       <el-table
+        ref="dataTable"
         v-loading="listLoading"
         :data="list"
         element-loading-text="加载中..."
@@ -1520,6 +1521,14 @@ export default {
           msg += `，${totalFailed} 个失败`
         }
         this.$message.success(msg)
+
+        // 下载完成后清空选择（不刷新页面）
+        this.selectedRows = []
+        // 等待 DOM 更新后清空表格选择
+        await this.$nextTick()
+        if (this.$refs.dataTable) {
+          this.$refs.dataTable.clearSelection()
+        }
       } catch (error) {
         if (error === 'cancel') {
           return
