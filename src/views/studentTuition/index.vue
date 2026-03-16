@@ -82,8 +82,6 @@
       <div class="table-operation">
         <el-button type="primary" icon="el-icon-plus" @click="handleAdd">新增学费信息</el-button>
         <el-button type="success" icon="el-icon-upload2" @click="handleImport">批量导入</el-button>
-        <el-button type="success" icon="el-icon-message" @click="handleBatchEmail">批量发送邮件</el-button>
-        <el-button type="warning" icon="el-icon-download" :loading="downloadSelectedLoading" :disabled="selectedRows.length === 0" @click="handleDownloadSelectedPdfs">下载选中PDF({{ selectedRows.length }})</el-button>
         <el-button icon="el-icon-refresh" @click="refreshCache">刷新</el-button>
       </div>
     </el-card>
@@ -102,7 +100,7 @@
         :max-height="tableHeight"
         @selection-change="handleSelectionChange"
       >
-        <el-table-column type="selection" width="55" align="center" />
+
         <el-table-column label="学生" align="center" min-width="180">
           <template slot-scope="scope">
             <div style="font-weight: bold;">{{ scope.row.student_name }}</div>
@@ -483,7 +481,6 @@ export default {
       allFamilyOptions: [],
       selectedRows: [],
       downloadAllLoading: false,
-      downloadSelectedLoading: false,
       academicYearOptions: ['2025-2026', '2024-2025', '2023-2024'],
       // 支付方式配置常量
       PAYMENT_TYPE_CONFIG: {
