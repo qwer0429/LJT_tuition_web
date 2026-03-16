@@ -83,6 +83,7 @@
         <el-button type="primary" icon="el-icon-plus" @click="handleAdd">新增学费信息</el-button>
         <el-button type="success" icon="el-icon-upload2" @click="handleImport">批量导入</el-button>
         <el-button type="success" icon="el-icon-message" @click="handleBatchEmail">批量发送邮件</el-button>
+        <el-button type="warning" icon="el-icon-download" :loading="downloadSelectedLoading" :disabled="selectedRows.length === 0" @click="handleDownloadSelectedPdfs">下载选中PDF({{ selectedRows.length }})</el-button>
         <el-button icon="el-icon-refresh" @click="refreshCache">刷新</el-button>
       </div>
     </el-card>
@@ -481,6 +482,7 @@ export default {
       allFamilyOptions: [],
       selectedRows: [],
       downloadAllLoading: false,
+      downloadSelectedLoading: false,
       academicYearOptions: ['2025-2026', '2024-2025', '2023-2024'],
       // 支付方式配置常量
       PAYMENT_TYPE_CONFIG: {
@@ -1350,51 +1352,76 @@ export default {
     // 一键下载所有PDF
     async handleDownloadAllPdfs() {
       try {
-        await this.$confirm('即将下载所有家庭的学费PDF文件，打包成zip格式。根据数据量大小，可能需要一些时间，请耐心等待。', '确认下载', {
+        await this.$confirm('即将分批下载所有家庭的学费PDF文件，每批50个家庭，打包成zip格式。请耐心等待。', '确认下载', {
           confirmButtonText: '确认下载',
           cancelButtonText: '取消',
           type: 'info'
         })
 
-        this.downloadAllLoading = true
-        this.$message.info('正在生成PDF文件，请稍候...')
+        const batchSize = 50
+        let batchIndex = 0
+        let totalBatches = null
+        let totalGenerated = 0
+        let totalFailed = 0
 
-        // 发送请求，设置responseType为blob以接收文件流
-        const response = await this.$http.post('/tuition/email/', {
-          action: 'download_all_pdfs'
-        }, {
-          responseType: 'blob'
-        })
+        this.$message.info('开始批量下载PDF文件...')
 
-        // 从响应头获取文件名
-        const contentDisposition = response.headers['content-disposition']
-        let filename = 'All_Tuition_Invoices.zip'
-        if (contentDisposition) {
-          const filenameMatch = contentDisposition.match(/filename="?(.+?)"?$/)
-          if (filenameMatch) {
-            filename = filenameMatch[1]
+        do {
+          this.downloadAllLoading = true
+
+          // 发送分批请求
+          const response = await this.$http.post('/tuition/email/', {
+            action: 'download_all_pdfs',
+            batch_size: batchSize,
+            batch_index: batchIndex
+          }, {
+            responseType: 'blob'
+          })
+
+          // 从响应头获取批次信息
+          totalBatches = parseInt(response.headers['x-total-batches'] || 1)
+          const generatedCount = parseInt(response.headers['x-generated-count'] || 0)
+          const failedCount = parseInt(response.headers['x-failed-count'] || 0)
+
+          totalGenerated += generatedCount
+          totalFailed += failedCount
+
+          // 获取文件名
+          const contentDisposition = response.headers['content-disposition']
+          let filename = `Tuition_Batch_${batchIndex + 1}_of_${totalBatches}.zip`
+          if (contentDisposition) {
+            const filenameMatch = contentDisposition.match(/filename="?(.+?)"?$/)
+            if (filenameMatch) {
+              filename = filenameMatch[1]
+            }
           }
-        }
 
-        // 获取生成统计信息
-        const generatedCount = response.headers['x-generated-count'] || 0
-        const failedCount = response.headers['x-failed-count'] || 0
+          // 下载文件
+          const blob = new Blob([response.data], { type: 'application/zip' })
+          const url = window.URL.createObjectURL(blob)
+          const link = document.createElement('a')
+          link.href = url
+          link.download = filename
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          window.URL.revokeObjectURL(url)
 
-        // 创建下载链接
-        const blob = new Blob([response.data], { type: 'application/zip' })
-        const url = window.URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = url
-        link.download = filename
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        window.URL.revokeObjectURL(url)
+          // 显示进度
+          this.$message.success(`第 ${batchIndex + 1}/${totalBatches} 批下载完成，本批生成 ${generatedCount} 个PDF`)
 
-        // 显示成功消息
-        let msg = `下载成功，共生成 ${generatedCount} 个PDF文件`
-        if (parseInt(failedCount) > 0) {
-          msg += `，${failedCount} 个失败`
+          batchIndex++
+
+          // 添加小延迟，避免浏览器拦截
+          if (batchIndex < totalBatches) {
+            await new Promise(resolve => setTimeout(resolve, 1000))
+          }
+        } while (batchIndex < totalBatches)
+
+        // 显示总结消息
+        let msg = `全部下载完成！总共生成 ${totalGenerated} 个PDF文件`
+        if (totalFailed > 0) {
+          msg += `，${totalFailed} 个失败`
         }
         this.$message.success(msg)
       } catch (error) {
@@ -1405,6 +1432,102 @@ export default {
         this.$message.error('下载失败：' + (error.message || '网络错误'))
       } finally {
         this.downloadAllLoading = false
+      }
+    },
+
+    // 下载选中行的PDF
+    async handleDownloadSelectedPdfs() {
+      if (this.selectedRows.length === 0) {
+        this.$message.warning('请先选择要下载的学费记录')
+        return
+      }
+
+      // 获取唯一的家庭编号
+      const uniqueInvoiceNos = [...new Set(this.selectedRows.map(row => row.invoice_no).filter(Boolean))]
+      if (uniqueInvoiceNos.length === 0) {
+        this.$message.warning('选中的记录没有家庭编号')
+        return
+      }
+
+      try {
+        await this.$confirm(`即将下载 ${uniqueInvoiceNos.length} 个家庭的PDF文件，打包成zip格式。请稍候...`, '确认下载', {
+          confirmButtonText: '确认下载',
+          cancelButtonText: '取消',
+          type: 'info'
+        })
+
+        const batchSize = 50
+        let batchIndex = 0
+        let totalBatches = null
+        let totalGenerated = 0
+        let totalFailed = 0
+
+        this.downloadSelectedLoading = true
+        this.$message.info('开始下载选中家庭的PDF文件...')
+
+        do {
+          const response = await this.$http.post('/tuition/email/', {
+            action: 'download_all_pdfs',
+            invoice_nos: uniqueInvoiceNos,
+            batch_size: batchSize,
+            batch_index: batchIndex
+          }, {
+            responseType: 'blob'
+          })
+
+          totalBatches = parseInt(response.headers['x-total-batches'] || 1)
+          const generatedCount = parseInt(response.headers['x-generated-count'] || 0)
+          const failedCount = parseInt(response.headers['x-failed-count'] || 0)
+
+          totalGenerated += generatedCount
+          totalFailed += failedCount
+
+          // 获取文件名
+          const contentDisposition = response.headers['content-disposition']
+          let filename = `Tuition_Selected_Batch_${batchIndex + 1}_of_${totalBatches}.zip`
+          if (contentDisposition) {
+            const filenameMatch = contentDisposition.match(/filename="?(.+?)"?$/)
+            if (filenameMatch) {
+              filename = filenameMatch[1]
+            }
+          }
+
+          // 下载文件
+          const blob = new Blob([response.data], { type: 'application/zip' })
+          const url = window.URL.createObjectURL(blob)
+          const link = document.createElement('a')
+          link.href = url
+          link.download = filename
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          window.URL.revokeObjectURL(url)
+
+          // 显示进度
+          this.$message.success(`第 ${batchIndex + 1}/${totalBatches} 批下载完成，本批生成 ${generatedCount} 个PDF`)
+
+          batchIndex++
+
+          // 添加小延迟
+          if (batchIndex < totalBatches) {
+            await new Promise(resolve => setTimeout(resolve, 1000))
+          }
+        } while (batchIndex < totalBatches)
+
+        // 显示总结消息
+        let msg = `选中家庭下载完成！总共生成 ${totalGenerated} 个PDF文件`
+        if (totalFailed > 0) {
+          msg += `，${totalFailed} 个失败`
+        }
+        this.$message.success(msg)
+      } catch (error) {
+        if (error === 'cancel') {
+          return
+        }
+        console.error('下载失败:', error)
+        this.$message.error('下载失败：' + (error.message || '网络错误'))
+      } finally {
+        this.downloadSelectedLoading = false
       }
     },
 
