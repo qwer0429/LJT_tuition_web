@@ -73,6 +73,7 @@
         </el-form-item>
         <el-form-item>
           <el-button type="primary" icon="el-icon-search" @click="handleCalculateFamily">计算选中家庭</el-button>
+          <el-button type="success" icon="el-icon-message" :disabled="selectedFamilies.length === 0" @click="handleSendSelectedBatchEmail">发送选中({{ selectedFamilies.length }})</el-button>
           <el-button icon="el-icon-refresh" @click="handleReset">重置</el-button>
         </el-form-item>
       </el-form>
@@ -918,10 +919,55 @@ export default {
       }
     },
 
-    // 打开批量发送邮件对话框
+    // 打开批量发送邮件对话框（发送所有家庭）
     handleSendBatchEmail() {
       this.batchEmailAttachmentList = []
       this.batchEmailDialogVisible = true
+    },
+
+    // 批量发送选中家庭的邮件
+    async handleSendSelectedBatchEmail() {
+      if (this.selectedFamilies.length === 0) {
+        this.$message.warning('请先选择要发送邮件的家庭')
+        return
+      }
+
+      try {
+        await this.$confirm(`即将发送选中的 ${this.selectedFamilies.length} 个家庭的学费通知邮件，请确认。`, '确认发送', {
+          confirmButtonText: '确认发送',
+          cancelButtonText: '取消',
+          type: 'info'
+        })
+
+        const invoiceNos = this.selectedFamilies.map(f => f.invoice_no)
+        this.$message.info('批量邮件发送任务已启动，正在后台发送...')
+
+        const res = await this.$http.post('/tuition/email/', {
+          action: 'send_batch',
+          invoice_nos: invoiceNos
+        })
+
+        const data = res.data || res
+        this.$message.success(data.message || `批量邮件发送任务已启动，共发送 ${invoiceNos.length} 个家庭`)
+
+        // 清空选择
+        this.selectedFamilies = []
+        this.isSelectAll = false
+        if (this.calculationResult?.families) {
+          this.calculationResult.families.forEach((family, index) => {
+            this.$set(this.calculationResult.families[index], 'isSelected', false)
+          })
+        }
+
+        // 刷新列表数据
+        this.fetchCalculationResult()
+      } catch (error) {
+        if (error === 'cancel') {
+          return
+        }
+        console.error('批量邮件发送失败:', error)
+        this.$message.error('批量邮件发送失败：' + (error.message || '网络错误'))
+      }
     },
 
     // 处理批量邮件附件选择
