@@ -134,7 +134,8 @@
             <el-tag v-if="scope.row.discount_alumni > 0" type="success" size="small" class="discount-tag">校友</el-tag>
             <el-tag v-if="scope.row.scholarship_amount > 0" type="info" size="small" class="discount-tag">奖学金 ¥{{ scope.row.scholarship_amount }}</el-tag>
             <el-tag v-if="scope.row.scholarship_discount_rate > 0" type="info" size="small" class="discount-tag">奖学金比例 {{ scope.row.scholarship_discount_rate }}%</el-tag>
-            <span v-if="!scope.row.is_teacher_child && !(scope.row.discount_sibling > 0) && !(scope.row.discount_company > 0) && !(scope.row.discount_alumni > 0) && !(scope.row.scholarship_amount > 0) && !(scope.row.scholarship_discount_rate > 0)">-</span>
+            <el-tag v-if="scope.row.financial_aid_discount_rate > 0" type="info" size="small" class="discount-tag">助学金比例 {{ scope.row.financial_aid_discount_rate }}%</el-tag>
+            <span v-if="!scope.row.is_teacher_child && !(scope.row.discount_sibling > 0) && !(scope.row.discount_company > 0) && !(scope.row.discount_alumni > 0) && !(scope.row.scholarship_amount > 0) && !(scope.row.scholarship_discount_rate > 0) && !(scope.row.financial_aid_discount_rate > 0)">-</span>
           </template>
         </el-table-column>
 
@@ -306,6 +307,18 @@
             </el-form-item>
           </el-col>
         </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="助学金">
+              <el-input-number v-model="tuitionForm.financial_aid" :min="0" :precision="2" :controls="true" controls-position="right" style="width: 100%;" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="助学金折扣(%)" prop="financial_aid_discount_rate">
+              <el-input-number v-model="tuitionForm.financial_aid_discount_rate" :min="0" :max="100" :precision="2" :controls="true" controls-position="right" style="width: 100%;" />
+            </el-form-item>
+          </el-col>
+        </el-row>
       </el-form>
       <div slot="footer" class="dialog-footer">
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -327,6 +340,7 @@
         class="upload-demo"
         drag
         :action="uploadAction"
+        :headers="uploadHeaders"
         :data="importForm"
         :on-success="handleUploadSuccess"
         :on-error="handleUploadError"
@@ -446,9 +460,21 @@
             </span>
             <span v-else>-</span>
           </el-descriptions-item>
+          <el-descriptions-item label="助学金">
+            <span v-if="detailData.financial_aid > 0" class="discount-text">
+              -¥{{ detailData.financial_aid }}
+            </span>
+            <span v-else>-</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="助学金比例">
+            <span v-if="detailData.financial_aid_discount_rate > 0" class="discount-text">
+              {{ detailData.financial_aid_discount_rate }}%
+            </span>
+            <span v-else>-</span>
+          </el-descriptions-item>
           <el-descriptions-item label="折扣后学费">
-            <span v-if="detailData.payment_type === 'semester_1' || detailData.payment_type === 'semester_2'">¥{{ (detailData.semester_tuition_before_discount - detailData.sibling_discount_amount - detailData.teacher_discount_amount - detailData.alumni_discount_amount - detailData.scholarship_amount - detailData.company_discount_amount).toFixed(2) }}</span>
-            <span v-else>¥{{ (detailData.base_tuition - detailData.sibling_discount_amount - detailData.teacher_discount_amount - detailData.alumni_discount_amount - detailData.scholarship_amount - detailData.company_discount_amount).toFixed(2) }}</span>
+            <span v-if="detailData.payment_type === 'semester_1' || detailData.payment_type === 'semester_2'">¥{{ (detailData.semester_tuition_before_discount - detailData.sibling_discount_amount - detailData.teacher_discount_amount - detailData.alumni_discount_amount - detailData.scholarship_amount - detailData.company_discount_amount - detailData.financial_aid).toFixed(2) }}</span>
+            <span v-else>¥{{ (detailData.base_tuition - detailData.sibling_discount_amount - detailData.teacher_discount_amount - detailData.alumni_discount_amount - detailData.scholarship_amount - detailData.company_discount_amount - detailData.financial_aid).toFixed(2) }}</span>
           </el-descriptions-item>
         </el-descriptions>
 
@@ -464,6 +490,8 @@
 </template>
 
 <script>
+import { getToken } from '@/utils/auth'
+
 export default {
   name: 'StudentTuition',
   data() {
@@ -504,6 +532,9 @@ export default {
       dialogTitle: '',
       isEdit: false,
       uploadAction: '/sljt/tuition/excel/',
+      uploadHeaders: {
+        'Authorization': 'Bearer ' + getToken()
+      },
       importForm: {
         academic_year: ''
       },
@@ -524,7 +555,9 @@ export default {
         discount_alumni: 0,
         discount_sibling: 0,
         scholarship_amount: 0,
-        scholarship_discount_rate: 0
+        scholarship_discount_rate: 0,
+        financial_aid: 0,
+        financial_aid_discount_rate: 0
       },
       detailData: null,
       detailSemesterId: null,
@@ -748,6 +781,8 @@ export default {
           email_sent: !!item.email_sent,
           scholarship_amount: parseFloat(item.scholarship_amount) || 0,
           scholarship_discount_rate: parseFloat(item.scholarship_discount_rate) || 0,
+          financial_aid: parseFloat(item.financial_aid) || 0,
+          financial_aid_discount_rate: parseFloat(item.financial_aid_discount_rate) || 0,
           discount_company: parseFloat(item.discount_company) || 0,
           discount_alumni: parseFloat(item.discount_alumni) || 0,
           discount_sibling: parseFloat(item.discount_sibling) || 0
@@ -1058,7 +1093,9 @@ export default {
         discount_alumni: 0,
         discount_sibling: 0,
         scholarship_amount: 0,
-        scholarship_discount_rate: 0
+        scholarship_discount_rate: 0,
+        financial_aid: 0,
+        financial_aid_discount_rate: 0
       }
       this.dialogVisible = true
       this.$nextTick(() => {
@@ -1136,7 +1173,9 @@ export default {
         discount_alumni: parseFloat(row.discount_alumni) || 0,
         discount_sibling: parseFloat(row.discount_sibling) || 0,
         scholarship_amount: parseFloat(row.scholarship_amount) || 0,
-        scholarship_discount_rate: parseFloat(row.scholarship_discount_rate) || 0
+        scholarship_discount_rate: parseFloat(row.scholarship_discount_rate) || 0,
+        financial_aid: parseFloat(row.financial_aid) || 0,
+        financial_aid_discount_rate: parseFloat(row.financial_aid_discount_rate) || 0
       }
 
       this.tuitionForm = {
@@ -1156,7 +1195,9 @@ export default {
         discount_alumni: parseFloat(row.discount_alumni) || 0,
         discount_sibling: parseFloat(row.discount_sibling) || 0,
         scholarship_amount: parseFloat(row.scholarship_amount) || 0,
-        scholarship_discount_rate: parseFloat(row.scholarship_discount_rate) || 0
+        scholarship_discount_rate: parseFloat(row.scholarship_discount_rate) || 0,
+        financial_aid: parseFloat(row.financial_aid) || 0,
+        financial_aid_discount_rate: parseFloat(row.financial_aid_discount_rate) || 0
       }
       this.dialogVisible = true
       this.$nextTick(() => {
@@ -1275,6 +1316,8 @@ export default {
               registration_fee: form.registration_fee ? parseFloat(form.registration_fee) : null,
               scholarship_amount: parseFloat(form.scholarship_amount) || 0,
               scholarship_discount_rate: parseFloat(form.scholarship_discount_rate) || 0,
+              financial_aid: parseFloat(form.financial_aid) || 0,
+              financial_aid_discount_rate: parseFloat(form.financial_aid_discount_rate) || 0,
               discount_company: parseFloat(form.discount_company) || 0,
               discount_alumni: parseFloat(form.discount_alumni) || 0,
               discount_sibling: parseFloat(form.discount_sibling) || 0

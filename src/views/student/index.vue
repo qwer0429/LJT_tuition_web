@@ -102,6 +102,7 @@
         class="upload-demo"
         drag
         action="/sljt/masterlist_excel/"
+        :headers="uploadHeaders"
         :on-success="handleUploadSuccess"
         :on-error="handleUploadError"
         accept=".xlsx,.xls"
@@ -204,6 +205,8 @@
 </template>
 
 <script>
+import { getToken } from '@/utils/auth'
+
 export default {
   name: 'StudentManage',
   data() {
@@ -221,6 +224,9 @@ export default {
         student_no: ''
       },
       importDialogVisible: false,
+      uploadHeaders: {
+        'Authorization': 'Bearer ' + getToken()
+      },
       dialogVisible: false,
       dialogTitle: '',
       isEdit: false,
