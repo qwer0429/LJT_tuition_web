@@ -53,6 +53,7 @@
             </el-option>
           </el-select>
         </el-form-item>
+
         <el-form-item label="家庭编号：">
           <el-select v-model="selectedFamily" placeholder="请选择家庭" clearable filterable style="width: 200px;">
             <el-option
@@ -1005,9 +1006,20 @@ export default {
 
           if (status.email_sent) {
             // 邮件已成功发送
-            this.$message.success(`邮件发送成功！发送时间：${status.email_sent_at}`)
+            this.$notify({
+              title: '邮件发送成功',
+              dangerouslyUseHTMLString: true,
+              message: `<div style="line-height: 1.6;">
+                <p><strong>${status.invoice_no || this.emailSendingInvoiceNo}</strong></p>
+                <p>发送时间：${status.email_sent_at}</p>
+              </div>`,
+              type: 'success',
+              duration: 5000,
+              position: 'bottom-right'
+            })
             this.stopEmailStatusPolling()
-            // 刷新列表数据（如果需要）
+            this.emailSendingInvoiceNo = null
+            // 刷新列表数据
             this.fetchCalculationResult()
           } else {
             console.log('[邮件状态] 尚未发送成功，继续轮询...')
@@ -1044,13 +1056,26 @@ export default {
         const invoiceNos = this.selectedFamilies.map(f => f.invoice_no)
         this.$message.info('批量邮件发送任务已启动，正在后台发送...')
 
-        const res = await this.$http.post('/tuition/email/', {
+        const data = await this.$http.post('/tuition/email/', {
           action: 'send_batch',
           invoice_nos: invoiceNos
         })
 
-        const data = res.data || res
-        this.$message.success(data.message || `批量邮件发送任务已启动，共发送 ${invoiceNos.length} 个家庭`)
+        this.$message.success(data.message || `批量邮件发送任务已启动，共提交 ${invoiceNos.length} 个家庭`)
+
+        // 显示发送完成提示
+        this.$notify({
+          title: '批量发送已启动',
+          dangerouslyUseHTMLString: true,
+          message: `<div style="line-height: 1.6;">
+            <p><strong>已成功提交 ${invoiceNos.length} 个家庭</strong>的邮件发送任务</p>
+            <p style="color: #666; margin-top: 5px;">系统将在后台逐步处理，每封邮件间隔0.5秒发送</p>
+            <p style="color: #666;">请稍后刷新页面查看发送状态</p>
+          </div>`,
+          type: 'success',
+          duration: 8000,
+          position: 'bottom-right'
+        })
 
         // 清空选择
         this.selectedFamilies = []
@@ -1097,14 +1122,28 @@ export default {
           formData.append('attachments', file.raw)
         })
 
-        const res = await this.$http.post('/tuition/email/', formData, {
+        const data = await this.$http.post('/tuition/email/', formData, {
           headers: {
             'Content-Type': 'multipart/form-data'
           }
         })
 
-        const data = res.data || res
-        this.$message.success(data.message || '批量邮件发送任务已启动，请稍后刷新页面查看发送状态')
+        this.$message.success(data.message || '批量邮件发送任务已启动')
+
+        // 显示发送完成提示
+        this.$notify({
+          title: '批量发送已启动',
+          dangerouslyUseHTMLString: true,
+          message: `<div style="line-height: 1.6;">
+            <p><strong>所有家庭的邮件发送任务已提交</strong></p>
+            <p style="color: #666; margin-top: 5px;">系统将在后台逐步处理，每封邮件间隔0.5秒发送</p>
+            <p style="color: #666;">请稍后刷新页面查看发送状态</p>
+          </div>`,
+          type: 'success',
+          duration: 8000,
+          position: 'bottom-right'
+        })
+
         this.batchEmailDialogVisible = false
         this.batchEmailAttachmentList = []
         // 刷新列表数据

@@ -145,10 +145,24 @@
             <el-tag v-else type="info" size="small">未发送</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" align="center" width="200" fixed="right">
+        <el-table-column label="操作" align="center" width="250" fixed="right">
           <template slot-scope="scope">
             <el-button type="text" size="small" @click="handleEdit(scope.row)">编辑</el-button>
             <el-button type="text" size="small" @click="handleViewDetail(scope.row)">查看详情</el-button>
+            <el-button 
+              v-if="!scope.row.email_sent" 
+              type="text" 
+              size="small" 
+              style="color: #409eff;" 
+              @click="handleSendEmail(scope.row)"
+            >发送邮件</el-button>
+            <el-button 
+              v-else
+              type="text" 
+              size="small" 
+              style="color: #67c23a;" 
+              @click="handleResendEmail(scope.row)"
+            >重新发送</el-button>
             <el-button type="text" size="small" style="color: #f56c6c;" @click="handleDelete(scope.row)">删除</el-button>
           </template>
         </el-table-column>
@@ -1281,6 +1295,92 @@ export default {
         if (error !== 'cancel') {
           this.$message.error('删除失败')
         }
+      }
+    },
+
+    // 发送邮件
+    async handleSendEmail(row) {
+      try {
+        await this.$confirm(`确认发送 ${row.invoice_no} 的学费邮件?`, '提示', {
+          confirmButtonText: '确认发送',
+          cancelButtonText: '取消',
+          type: 'info'
+        })
+
+        this.$message.info('邮件发送任务已启动...')
+
+        const data = await this.$http.post('/tuition/email/', {
+          action: 'send_single',
+          invoice_no: row.invoice_no
+        })
+
+        if (data.code === 1 || data.code === '1') {
+          this.$notify({
+            title: '邮件发送成功',
+            message: `${row.invoice_no} 的学费邮件已发送`,
+            type: 'success',
+            duration: 5000,
+            position: 'bottom-right'
+          })
+          // 刷新列表以更新邮件状态
+          this.getList()
+        } else {
+          this.$message.error(data.message || '邮件发送失败')
+        }
+      } catch (error) {
+        if (error === 'cancel') {
+          return
+        }
+        console.error('邮件发送失败:', error)
+        this.$message.error('邮件发送失败：' + (error.message || '网络错误'))
+      }
+    },
+
+    // 重新发送邮件
+    async handleResendEmail(row) {
+      try {
+        await this.$confirm(
+          `<div style="line-height: 1.8;">
+            <p><strong>家庭编号：</strong>${row.invoice_no}</p>
+            <p><strong>学生：</strong>${row.student_name || row.student_english_name || '-'}</p>
+            <p style="color: #e6a23c; margin-top: 10px;">⚠️ 该邮件已发送过，确定要重新发送吗？</p>
+          </div>`, 
+          '确认重新发送', 
+          {
+            confirmButtonText: '确认重新发送',
+            cancelButtonText: '取消',
+            type: 'warning',
+            dangerouslyUseHTMLString: true
+          }
+        )
+
+        this.$message.info('邮件重新发送任务已启动...')
+
+        const data = await this.$http.post('/tuition/email/', {
+          action: 'send_single',
+          invoice_no: row.invoice_no,
+          force_resend: true  // 标记为强制重新发送
+        })
+
+        if (data.code === 1 || data.code === '1') {
+          this.$notify({
+            title: '邮件重新发送成功',
+            message: `${row.invoice_no} 的学费邮件已重新发送`,
+            type: 'success',
+            duration: 5000,
+            position: 'bottom-right'
+          })
+          // 刷新列表以更新邮件状态
+          this.getList()
+        } else {
+          this.$message.error(data.message || '邮件重新发送失败')
+        }
+      } catch (error) {
+        if (error === 'cancel') {
+          return
+        }
+        console.error('邮件重新发送失败:', error)
+        this.$message.error('邮件重新发送失败：' + (error.message || '网络错误'))
       }
     },
 
