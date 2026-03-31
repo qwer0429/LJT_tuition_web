@@ -420,19 +420,29 @@
             <el-row :gutter="20">
               <el-col :span="12">
                 <el-form-item label="基础学费" :prop="'students.' + index + '.base_tuition'" :rules="{ required: true, message: '请输入基础学费', trigger: 'blur' }">
-                  <el-input-number v-model="student.base_tuition" :min="0" :precision="2" style="width: 100%;" />
+                  <el-input-number v-model="student.base_tuition" :min="0" :precision="2" style="width: 100%;" @change="calculateStudentDiscounts(index)" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="注册费">
+                  <el-input-number v-model="student.registration_fee" :min="0" :precision="2" style="width: 100%;" @change="calculateStudentDiscounts(index)" />
                 </el-form-item>
               </el-col>
             </el-row>
-            <el-divider content-position="left">折扣信息（可选）</el-divider>
+            <el-divider content-position="left">
+              折扣信息（可选）
+              <el-button type="text" size="mini" @click="calculateStudentDiscounts(index)">
+                <i class="el-icon-refresh" /> 自动计算折扣金额
+              </el-button>
+            </el-divider>
             <el-row :gutter="20">
               <el-col :span="12">
-                <el-form-item label="兄弟姐妹折扣率(%)">
-                  <el-input-number v-model="student.sibling_discount_rate" :min="0" :max="100" :precision="2" style="width: 100%;" />
+                <el-form-item label="家庭折扣率(%)" label-width="120px">
+                  <el-input-number v-model="student.sibling_discount_rate" :min="0" :max="100" :precision="2" style="width: 100%;" @change="calculateStudentDiscounts(index)" />
                 </el-form-item>
               </el-col>
               <el-col :span="12">
-                <el-form-item label="兄弟姐妹折扣额">
+                <el-form-item label="家庭折扣额" label-width="120px">
                   <el-input-number v-model="student.sibling_discount_amount" :min="0" :precision="2" style="width: 100%;" />
                 </el-form-item>
               </el-col>
@@ -440,7 +450,7 @@
             <el-row :gutter="20">
               <el-col :span="12">
                 <el-form-item label="校友折扣率(%)">
-                  <el-input-number v-model="student.alumni_discount_rate" :min="0" :max="100" :precision="2" style="width: 100%;" />
+                  <el-input-number v-model="student.alumni_discount_rate" :min="0" :max="100" :precision="2" style="width: 100%;" @change="calculateStudentDiscounts(index)" />
                 </el-form-item>
               </el-col>
               <el-col :span="12">
@@ -452,7 +462,7 @@
             <el-row :gutter="20">
               <el-col :span="12">
                 <el-form-item label="公司折扣率(%)">
-                  <el-input-number v-model="student.company_discount_rate" :min="0" :max="100" :precision="2" style="width: 100%;" />
+                  <el-input-number v-model="student.company_discount_rate" :min="0" :max="100" :precision="2" style="width: 100%;" @change="calculateStudentDiscounts(index)" />
                 </el-form-item>
               </el-col>
               <el-col :span="12">
@@ -464,12 +474,12 @@
             <el-row :gutter="20">
               <el-col :span="12">
                 <el-form-item label="教师子弟">
-                  <el-switch v-model="student.is_teacher_child" active-text="是" inactive-text="否" />
+                  <el-switch v-model="student.is_teacher_child" active-text="是" inactive-text="否" @change="calculateStudentDiscounts(index)" />
                 </el-form-item>
               </el-col>
               <el-col :span="12">
                 <el-form-item label="教师折扣率(%)">
-                  <el-input-number v-model="student.teacher_discount_rate" :min="0" :max="100" :precision="2" style="width: 100%;" :disabled="!student.is_teacher_child" />
+                  <el-input-number v-model="student.teacher_discount_rate" :min="0" :max="100" :precision="2" style="width: 100%;" :disabled="!student.is_teacher_child" @change="calculateStudentDiscounts(index)" />
                 </el-form-item>
               </el-col>
             </el-row>
@@ -485,11 +495,36 @@
                 </el-form-item>
               </el-col>
             </el-row>
-            <el-divider content-position="left">奖学金（可选）</el-divider>
+            <el-divider content-position="left">奖学金设置</el-divider>
             <el-row :gutter="20">
               <el-col :span="12">
+                <el-form-item label="奖学金类型">
+                  <el-select v-model="student.scholarship_type" style="width: 100%;" @change="handleScholarshipTypeChange(index)">
+                    <el-option label="无" value="none" />
+                    <el-option label="定额（学费直接为此金额）" value="fixed" />
+                    <el-option label="比例折扣（从学费中扣除）" value="percentage" />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <!-- 定额奖学金 -->
+            <el-row v-if="student.scholarship_type === 'fixed'" :gutter="20">
+              <el-col :span="12">
+                <el-form-item label="奖学金定额">
+                  <el-input-number v-model="student.scholarship_amount" :min="0" :precision="2" style="width: 100%;" placeholder="学费将等于此金额" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <div style="line-height: 36px; color: #909399; font-size: 12px;">
+                  最终学费 = {{ student.scholarship_amount || 0 }} + 注册费
+                </div>
+              </el-col>
+            </el-row>
+            <!-- 比例奖学金 -->
+            <el-row v-if="student.scholarship_type === 'percentage'" :gutter="20">
+              <el-col :span="12">
                 <el-form-item label="奖学金折扣率(%)">
-                  <el-input-number v-model="student.scholarship_discount_rate" :min="0" :max="100" :precision="2" style="width: 100%;" />
+                  <el-input-number v-model="student.scholarship_discount_rate" :min="0" :max="100" :precision="2" style="width: 100%;" @change="calculateStudentDiscounts(index)" />
                 </el-form-item>
               </el-col>
               <el-col :span="12">
@@ -498,11 +533,71 @@
                 </el-form-item>
               </el-col>
             </el-row>
+
+            <el-divider content-position="left">助学金(Bursary)设置</el-divider>
             <el-row :gutter="20">
               <el-col :span="12">
-                <el-form-item label="奖学金固定金额">
-                  <el-input-number v-model="student.scholarship_amount" :min="0" :precision="2" style="width: 100%;" />
+                <el-form-item label="助学金类型">
+                  <el-select v-model="student.financial_aid_type" style="width: 100%;" @change="handleFinancialAidTypeChange(index)">
+                    <el-option label="无" value="none" />
+                    <el-option label="定额（学费直接为此金额）" value="fixed" />
+                    <el-option label="比例折扣（从学费中扣除）" value="percentage" />
+                  </el-select>
                 </el-form-item>
+              </el-col>
+            </el-row>
+            <!-- 定额助学金 -->
+            <el-row v-if="student.financial_aid_type === 'fixed'" :gutter="20">
+              <el-col :span="12">
+                <el-form-item label="助学金定额">
+                  <el-input-number v-model="student.financial_aid_amount" :min="0" :precision="2" style="width: 100%;" placeholder="学费将等于此金额" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <div style="line-height: 36px; color: #909399; font-size: 12px;">
+                  最终学费 = {{ student.financial_aid_amount || 0 }} + 注册费
+                </div>
+              </el-col>
+            </el-row>
+            <!-- 比例助学金 -->
+            <el-row v-if="student.financial_aid_type === 'percentage'" :gutter="20">
+              <el-col :span="12">
+                <el-form-item label="助学金折扣率(%)" label-width="130px">
+                  <el-input-number v-model="student.financial_aid_discount_rate" :min="0" :max="100" :precision="2" style="width: 100%;" @change="calculateStudentDiscounts(index)" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="助学金折扣额">
+                  <el-input-number v-model="student.financial_aid_discount_amount" :min="0" :precision="2" style="width: 100%;" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+
+            <!-- 金额预览 -->
+            <el-divider content-position="left">
+              <span style="color: #67C23A;">金额预览</span>
+            </el-divider>
+            <el-row :gutter="20">
+              <el-col :span="24">
+                <div class="amount-preview">
+                  <div class="preview-item">
+                    <span class="label">基础学费:</span>
+                    <span class="value">¥{{ formatMoney(student.base_tuition) }}</span>
+                  </div>
+                  <div v-if="student.scholarship_type !== 'fixed' && getTotalDiscountAmount(student) > 0" class="preview-item discount">
+                    <span class="label">总折扣:</span>
+                    <span class="value">-¥{{ formatMoney(getTotalDiscountAmount(student)) }}</span>
+                  </div>
+                  <div v-if="student.scholarship_type === 'fixed'" class="preview-item">
+                    <span class="label">奖学金定额:</span>
+                    <span class="value">¥{{ formatMoney(student.scholarship_amount) }}</span>
+                  </div>
+                  <div class="preview-item highlight">
+                    <span class="label">最终学费:</span>
+                    <span class="value">¥{{ formatMoney(calculateFinalAmount(student)) }}</span>
+                    <span class="detail">({{ getCalculationDetail(student) }})</span>
+                  </div>
+                </div>
               </el-col>
             </el-row>
           </el-card>
@@ -570,11 +665,13 @@ export default {
         end_date: '',
         include_bus: true,
         bus_fee: 11000,
+
         students: [{
           english_name: '',
           student_no: '',
           grade: '',
           base_tuition: 165000,
+  
           sibling_discount_rate: 0,
           sibling_discount_amount: 0,
           company_discount_rate: 0,
@@ -585,9 +682,14 @@ export default {
           teacher_discount_rate: 0,
           teacher_discount_amount: 0,
           needs_school_bus: true,
+          scholarship_type: 'none', // 'none' | 'fixed' | 'percentage'
           scholarship_discount_rate: 0,
           scholarship_discount_amount: 0,
-          scholarship_amount: 0
+          scholarship_amount: 0,
+          financial_aid_type: 'none', // 'none' | 'fixed' | 'percentage'
+          financial_aid_discount_rate: 0,
+          financial_aid_discount_amount: 0,
+          financial_aid: 0
         }]
       },
       manualPdfRules: {
@@ -1055,11 +1157,13 @@ export default {
         end_date: '',
         include_bus: true,
         bus_fee: 11000,
+
         students: [{
           english_name: '',
           student_no: '',
           grade: '',
           base_tuition: 165000,
+  
           sibling_discount_rate: 0,
           sibling_discount_amount: 0,
           company_discount_rate: 0,
@@ -1070,9 +1174,14 @@ export default {
           teacher_discount_rate: 0,
           teacher_discount_amount: 0,
           needs_school_bus: true,
+          scholarship_type: 'none',
           scholarship_discount_rate: 0,
           scholarship_discount_amount: 0,
-          scholarship_amount: 0
+          scholarship_amount: 0,
+          financial_aid_type: 'none',
+          financial_aid_discount_rate: 0,
+          financial_aid_discount_amount: 0,
+          financial_aid: 0
         }]
       }
     },
@@ -1084,6 +1193,7 @@ export default {
         student_no: '',
         grade: '',
         base_tuition: 165000,
+
         sibling_discount_rate: 0,
         sibling_discount_amount: 0,
         company_discount_rate: 0,
@@ -1094,15 +1204,163 @@ export default {
         teacher_discount_rate: 0,
         teacher_discount_amount: 0,
         needs_school_bus: true,
+        scholarship_type: 'none',
         scholarship_discount_rate: 0,
         scholarship_discount_amount: 0,
-        scholarship_amount: 0
+        scholarship_amount: 0,
+        financial_aid_type: 'none',
+        financial_aid_discount_rate: 0,
+        financial_aid_discount_amount: 0,
+        financial_aid: 0
       })
     },
 
     // 删除学生
     removeStudent(index) {
       this.manualPdfForm.students.splice(index, 1)
+    },
+
+    // 处理奖学金类型变更
+    handleScholarshipTypeChange(index) {
+      const student = this.manualPdfForm.students[index]
+      // 重置相关字段
+      if (student.scholarship_type === 'none') {
+        student.scholarship_amount = 0
+        student.scholarship_discount_rate = 0
+        student.scholarship_discount_amount = 0
+      } else if (student.scholarship_type === 'fixed') {
+        student.scholarship_discount_rate = 0
+        student.scholarship_discount_amount = 0
+        // 如果助学金也是定额，提示用户只能二选一
+        if (student.financial_aid_type === 'fixed') {
+          this.$message.warning('奖学金和助学金不能同时设置为定额，已重置助学金')
+          student.financial_aid_type = 'none'
+          student.financial_aid = 0
+        }
+      } else if (student.scholarship_type === 'percentage') {
+        student.scholarship_amount = 0
+      }
+    },
+
+    // 处理助学金类型变更
+    handleFinancialAidTypeChange(index) {
+      const student = this.manualPdfForm.students[index]
+      // 重置相关字段
+      if (student.financial_aid_type === 'none') {
+        student.financial_aid = 0
+        student.financial_aid_discount_rate = 0
+        student.financial_aid_discount_amount = 0
+      } else if (student.financial_aid_type === 'fixed') {
+        student.financial_aid_discount_rate = 0
+        student.financial_aid_discount_amount = 0
+        // 如果奖学金也是定额，提示用户只能二选一
+        if (student.scholarship_type === 'fixed') {
+          this.$message.warning('奖学金和助学金不能同时设置为定额，已重置奖学金')
+          student.scholarship_type = 'none'
+          student.scholarship_amount = 0
+        }
+      } else if (student.financial_aid_type === 'percentage') {
+        student.financial_aid = 0
+      }
+    },
+
+    // 计算学生折扣金额（折上折）
+    calculateStudentDiscounts(index) {
+      const student = this.manualPdfForm.students[index]
+      const baseTuition = student.base_tuition || 0
+      let currentAmount = baseTuition
+
+      // 折上折计算：每个折扣基于上一次折扣后的金额
+      // 计算顺序：家庭折扣 -> 校友折扣 -> 奖学金 -> 助学金 -> 公司折扣
+
+      // 1. 家庭折扣（基于基础学费）
+      if (student.sibling_discount_rate > 0) {
+        student.sibling_discount_amount = parseFloat((currentAmount * student.sibling_discount_rate / 100).toFixed(2))
+        currentAmount -= student.sibling_discount_amount
+      }
+
+      // 2. 校友折扣（基于家庭折扣后的金额）
+      if (student.alumni_discount_rate > 0) {
+        student.alumni_discount_amount = parseFloat((currentAmount * student.alumni_discount_rate / 100).toFixed(2))
+        currentAmount -= student.alumni_discount_amount
+      }
+
+      // 3. 教师子弟折扣（基于校友折扣后的金额）
+      if (student.is_teacher_child && student.teacher_discount_rate > 0) {
+        student.teacher_discount_amount = parseFloat((currentAmount * student.teacher_discount_rate / 100).toFixed(2))
+        currentAmount -= student.teacher_discount_amount
+      }
+
+      // 4. 奖学金折扣（基于教师折扣后的金额）
+      if (student.scholarship_type === 'percentage' && student.scholarship_discount_rate > 0) {
+        student.scholarship_discount_amount = parseFloat((currentAmount * student.scholarship_discount_rate / 100).toFixed(2))
+        currentAmount -= student.scholarship_discount_amount
+      }
+
+      // 5. 助学金折扣（基于奖学金折扣后的金额）
+      if (student.financial_aid_type === 'percentage' && student.financial_aid_discount_rate > 0) {
+        student.financial_aid_discount_amount = parseFloat((currentAmount * student.financial_aid_discount_rate / 100).toFixed(2))
+        currentAmount -= student.financial_aid_discount_amount
+      }
+
+      // 6. 公司折扣（基于以上所有折扣后的金额，优先级最后）
+      if (student.company_discount_rate > 0) {
+        student.company_discount_amount = parseFloat((currentAmount * student.company_discount_rate / 100).toFixed(2))
+      }
+    },
+
+    // 获取总折扣金额
+    getTotalDiscountAmount(student) {
+      let total = 0
+      total += student.sibling_discount_amount || 0
+      total += student.company_discount_amount || 0
+      total += student.alumni_discount_amount || 0
+      total += student.teacher_discount_amount || 0
+      if (student.scholarship_type === 'percentage') {
+        total += student.scholarship_discount_amount || 0
+      }
+      if (student.financial_aid_type === 'percentage') {
+        total += student.financial_aid_discount_amount || 0
+      }
+      return total
+    },
+
+    // 计算最终金额
+    calculateFinalAmount(student) {
+      const baseTuition = student.base_tuition || 0
+      const registrationFee = student.registration_fee || 0
+
+      // 优先级：奖学金定额 > 助学金定额 > 比例折扣
+      if (student.scholarship_type === 'fixed') {
+        // 奖学金定额：学费 = 定额 + 注册费
+        return (student.scholarship_amount || 0) + registrationFee
+      } else if (student.financial_aid_type === 'fixed') {
+        // 助学金定额：学费 = 定额 + 注册费
+        return (student.financial_aid || 0) + registrationFee
+      } else {
+        // 比例折扣或无折扣
+        const totalDiscount = this.getTotalDiscountAmount(student)
+        return baseTuition - totalDiscount + registrationFee
+      }
+    },
+
+    // 获取计算详情文本
+    getCalculationDetail(student) {
+      const registrationFee = student.registration_fee || 0
+      if (student.scholarship_type === 'fixed') {
+        return `奖学金定额 ${student.scholarship_amount || 0} + 注册费 ${registrationFee}`
+      } else if (student.financial_aid_type === 'fixed') {
+        return `助学金定额 ${student.financial_aid || 0} + 注册费 ${registrationFee}`
+      } else {
+        const totalDiscount = this.getTotalDiscountAmount(student)
+        return `基础 ${student.base_tuition || 0} - 折扣 ${totalDiscount} + 注册费 ${registrationFee}`
+      }
+    },
+
+    // 格式化金额
+    formatMoney(amount) {
+      if (!amount) return '0.00'
+      return parseFloat(amount).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
     },
 
     // 生成手动PDF
@@ -1465,5 +1723,71 @@ export default {
 }
 .filter-container {
   margin-bottom: 15px;
+}
+
+/* 手动PDF金额预览样式 */
+.amount-preview {
+  background: #f5f7fa;
+  border-radius: 4px;
+  padding: 15px;
+  margin-top: 10px;
+}
+
+.amount-preview .preview-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.amount-preview .preview-item:last-child {
+  margin-bottom: 0;
+}
+
+.amount-preview .preview-item .label {
+  width: 100px;
+  color: #606266;
+}
+
+.amount-preview .preview-item .value {
+  font-weight: 500;
+  color: #303133;
+}
+
+.amount-preview .preview-item.discount .value {
+  color: #f56c6c;
+}
+
+.amount-preview .preview-item.highlight {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #dcdfe6;
+}
+
+.amount-preview .preview-item.highlight .label {
+  font-weight: bold;
+  color: #67c23a;
+}
+
+.amount-preview .preview-item.highlight .value {
+  font-size: 18px;
+  font-weight: bold;
+  color: #67c23a;
+}
+
+.amount-preview .preview-item .detail {
+  margin-left: 10px;
+  font-size: 12px;
+  color: #909399;
+}
+
+/* 学生卡片样式 */
+.student-section {
+  position: relative;
+}
+
+.student-section .el-card__header {
+  background: #f5f7fa;
+  padding: 10px 15px;
 }
 </style>
