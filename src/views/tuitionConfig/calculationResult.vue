@@ -312,7 +312,7 @@
       </div>
     </el-dialog>
 
-    <!-- 批量发送邮件对话框 -->
+    <!-- 批量发送邮件对话框（所有家庭） -->
     <el-dialog title="批量发送学费通知邮件" :visible.sync="batchEmailDialogVisible" width="600px">
       <el-form label-width="100px">
         <el-form-item label="发送范围">
@@ -338,6 +338,42 @@
       <div slot="footer" class="dialog-footer">
         <el-button @click="batchEmailDialogVisible = false">取消</el-button>
         <el-button type="success" :loading="batchEmailSending" @click="submitBatchSendEmail">批量发送</el-button>
+      </div>
+    </el-dialog>
+
+    <!-- 发送选中家庭对话框 -->
+    <el-dialog title="发送选中家庭的学费邮件" :visible.sync="selectedBatchEmailDialogVisible" width="600px">
+      <el-form label-width="100px">
+        <el-form-item label="发送范围">
+          <el-tag type="warning">已选中的 {{ selectedFamilies.length }} 个家庭</el-tag>
+        </el-form-item>
+        <el-form-item label="选中家庭">
+          <div style="max-height: 150px; overflow-y: auto; border: 1px solid #dcdfe6; border-radius: 4px; padding: 10px;">
+            <el-tag v-for="family in selectedFamilies" :key="family.invoice_no" size="small" style="margin: 2px;">
+              {{ family.invoice_no }}
+            </el-tag>
+          </div>
+        </el-form-item>
+        <el-form-item label="附加附件">
+          <el-upload
+            ref="selectedBatchEmailAttachmentUpload"
+            action="#"
+            :auto-upload="false"
+            :on-change="handleSelectedBatchEmailAttachmentChange"
+            :on-remove="handleSelectedBatchEmailAttachmentRemove"
+            :file-list="selectedBatchEmailAttachmentList"
+            multiple
+            drag
+          >
+            <i class="el-icon-upload"></i>
+            <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
+            <div slot="tip" class="el-upload__tip">支持PDF、Word、Excel、图片等格式，单文件不超过10MB。所有附件将随每封邮件一起发送。</div>
+          </el-upload>
+        </el-form-item>
+      </el-form>
+      <div slot="footer" class="dialog-footer">
+        <el-button @click="selectedBatchEmailDialogVisible = false">取消</el-button>
+        <el-button type="success" :loading="selectedBatchEmailSending" @click="submitSelectedBatchSendEmail">发送选中</el-button>
       </div>
     </el-dialog>
 
@@ -648,11 +684,14 @@ export default {
       isSelectAll: false,  // 是否全选
       emailDialogVisible: false,
       batchEmailDialogVisible: false,
+      selectedBatchEmailDialogVisible: false,  // 发送选中对话框
       emailSending: false,
       batchEmailSending: false,
+      selectedBatchEmailSending: false,  // 发送选中加载状态
       currentEmailFamily: null,
       emailAttachmentList: [],
       batchEmailAttachmentList: [],
+      selectedBatchEmailAttachmentList: [],  // 发送选中附件列表
       emailStatusPolling: null,  // 邮件状态轮询定时器
       emailSendingInvoiceNo: null,  // 当前正在查询发送状态的invoice_no
       manualPdfDialogVisible: false,
@@ -1039,26 +1078,53 @@ export default {
       this.batchEmailDialogVisible = true
     },
 
-    // 批量发送选中家庭的邮件
-    async handleSendSelectedBatchEmail() {
+    // 打开发送选中家庭的对话框
+    handleSendSelectedBatchEmail() {
+      if (this.selectedFamilies.length === 0) {
+        this.$message.warning('请先选择要发送邮件的家庭')
+        return
+      }
+      this.selectedBatchEmailAttachmentList = []
+      this.selectedBatchEmailDialogVisible = true
+    },
+
+    // 处理发送选中附件选择
+    handleSelectedBatchEmailAttachmentChange(file, fileList) {
+      this.selectedBatchEmailAttachmentList = fileList
+    },
+
+    // 处理发送选中附件移除
+    handleSelectedBatchEmailAttachmentRemove(file, fileList) {
+      this.selectedBatchEmailAttachmentList = fileList
+    },
+
+    // 提交发送选中家庭的邮件（带附件）
+    async submitSelectedBatchSendEmail() {
       if (this.selectedFamilies.length === 0) {
         this.$message.warning('请先选择要发送邮件的家庭')
         return
       }
 
+      this.selectedBatchEmailSending = true
       try {
-        await this.$confirm(`即将发送选中的 ${this.selectedFamilies.length} 个家庭的学费通知邮件，请确认。`, '确认发送', {
-          confirmButtonText: '确认发送',
-          cancelButtonText: '取消',
-          type: 'info'
-        })
-
         const invoiceNos = this.selectedFamilies.map(f => f.invoice_no)
         this.$message.info('批量邮件发送任务已启动，正在后台发送...')
 
-        const data = await this.$http.post('/tuition/email/', {
-          action: 'send_batch',
-          invoice_nos: invoiceNos
+        // 构建FormData
+        const formData = new FormData()
+        formData.append('action', 'send_batch')
+        // 使用 JSON 字符串发送数组，后端更可靠地解析
+        formData.append('invoice_nos', JSON.stringify(invoiceNos))
+
+        // 添加附件
+        this.selectedBatchEmailAttachmentList.forEach(file => {
+          formData.append('attachments', file.raw)
+        })
+
+        const data = await this.$http.post('/tuition/email/', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
         })
 
         this.$message.success(data.message || `批量邮件发送任务已启动，共提交 ${invoiceNos.length} 个家庭`)
@@ -1077,6 +1143,10 @@ export default {
           position: 'bottom-right'
         })
 
+        // 关闭对话框
+        this.selectedBatchEmailDialogVisible = false
+        this.selectedBatchEmailAttachmentList = []
+
         // 清空选择
         this.selectedFamilies = []
         this.isSelectAll = false
@@ -1089,11 +1159,10 @@ export default {
         // 刷新列表数据
         this.fetchCalculationResult()
       } catch (error) {
-        if (error === 'cancel') {
-          return
-        }
         console.error('批量邮件发送失败:', error)
         this.$message.error('批量邮件发送失败：' + (error.message || '网络错误'))
+      } finally {
+        this.selectedBatchEmailSending = false
       }
     },
 
