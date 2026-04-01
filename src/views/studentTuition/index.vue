@@ -375,6 +375,44 @@
       </div>
     </el-dialog>
 
+    <!-- 发送邮件对话框 -->
+    <el-dialog :title="isResend ? '重新发送学费邮件' : '发送学费邮件'" :visible.sync="emailDialogVisible" width="600px">
+      <el-form label-width="100px" v-if="currentEmailRow">
+        <el-form-item label="家庭编号">
+          <span>{{ currentEmailRow.invoice_no }}</span>
+        </el-form-item>
+        <el-form-item label="学生">
+          <span>{{ currentEmailRow.student_name || currentEmailRow.student_english_name || '-' }}</span>
+        </el-form-item>
+        <el-form-item label="邮件状态">
+          <el-tag v-if="currentEmailRow.email_sent" type="success">已发送</el-tag>
+          <el-tag v-else type="info">未发送</el-tag>
+        </el-form-item>
+        <el-form-item label="附加附件">
+          <el-upload
+            ref="emailAttachmentUpload"
+            action="#"
+            :auto-upload="false"
+            :on-change="handleEmailAttachmentChange"
+            :on-remove="handleEmailAttachmentRemove"
+            :file-list="emailAttachmentList"
+            multiple
+            drag
+          >
+            <i class="el-icon-upload"></i>
+            <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
+            <div slot="tip" class="el-upload__tip">支持PDF、Word、Excel、图片等格式，单文件不超过10MB</div>
+          </el-upload>
+        </el-form-item>
+      </el-form>
+      <div slot="footer" class="dialog-footer">
+        <el-button @click="emailDialogVisible = false">取消</el-button>
+        <el-button type="success" :loading="emailSending" @click="submitSendEmail">
+          {{ isResend ? '重新发送' : '发送邮件' }}
+        </el-button>
+      </div>
+    </el-dialog>
+
     <!-- 学费详情对话框 -->
     <el-dialog title="学费详情" :visible.sync="detailDialogVisible" width="700px">
       <div v-if="detailData">
@@ -577,6 +615,12 @@ export default {
       detailSemesterId: null,
       detailStudentId: null,
       editOriginData: null, // 编辑时保存原始数据，用于对比变化
+      // 邮件发送对话框
+      emailDialogVisible: false,
+      emailAttachmentList: [],
+      currentEmailRow: null,
+      isResend: false, // 标记是否为重新发送
+      emailSending: false,
       rules: {
         student: [{ required: true, message: '请选择学生', trigger: 'change' }],
         invoice_no: [{ required: true, message: '请输入家庭编号', trigger: 'blur' }],
@@ -1298,89 +1342,82 @@ export default {
       }
     },
 
-    // 发送邮件
-    async handleSendEmail(row) {
-      try {
-        await this.$confirm(`确认发送 ${row.invoice_no} 的学费邮件?`, '提示', {
-          confirmButtonText: '确认发送',
-          cancelButtonText: '取消',
-          type: 'info'
-        })
-
-        this.$message.info('邮件发送任务已启动...')
-
-        const data = await this.$http.post('/tuition/email/', {
-          action: 'send_single',
-          invoice_no: row.invoice_no
-        })
-
-        if (data.code === 1 || data.code === '1') {
-          this.$notify({
-            title: '邮件发送成功',
-            message: `${row.invoice_no} 的学费邮件已发送`,
-            type: 'success',
-            duration: 5000,
-            position: 'bottom-right'
-          })
-          // 刷新列表以更新邮件状态
-          this.getList()
-        } else {
-          this.$message.error(data.message || '邮件发送失败')
-        }
-      } catch (error) {
-        if (error === 'cancel') {
-          return
-        }
-        console.error('邮件发送失败:', error)
-        this.$message.error('邮件发送失败：' + (error.message || '网络错误'))
-      }
+    // 打开发送邮件对话框
+    handleSendEmail(row) {
+      this.currentEmailRow = row
+      this.isResend = false
+      this.emailAttachmentList = []
+      this.emailDialogVisible = true
     },
 
-    // 重新发送邮件
-    async handleResendEmail(row) {
+    // 打开重新发送邮件对话框
+    handleResendEmail(row) {
+      this.currentEmailRow = row
+      this.isResend = true
+      this.emailAttachmentList = []
+      this.emailDialogVisible = true
+    },
+
+    // 处理附件选择
+    handleEmailAttachmentChange(file, fileList) {
+      this.emailAttachmentList = fileList
+    },
+
+    // 处理附件移除
+    handleEmailAttachmentRemove(file, fileList) {
+      this.emailAttachmentList = fileList
+    },
+
+    // 提交发送邮件（带附件）
+    async submitSendEmail() {
+      if (!this.currentEmailRow) {
+        this.$message.warning('请选择要发送邮件的家庭')
+        return
+      }
+
+      this.emailSending = true
       try {
-        await this.$confirm(
-          `<div style="line-height: 1.8;">
-            <p><strong>家庭编号：</strong>${row.invoice_no}</p>
-            <p><strong>学生：</strong>${row.student_name || row.student_english_name || '-'}</p>
-            <p style="color: #e6a23c; margin-top: 10px;">⚠️ 该邮件已发送过，确定要重新发送吗？</p>
-          </div>`, 
-          '确认重新发送', 
-          {
-            confirmButtonText: '确认重新发送',
-            cancelButtonText: '取消',
-            type: 'warning',
-            dangerouslyUseHTMLString: true
+        const formData = new FormData()
+        formData.append('action', 'send_single')
+        formData.append('invoice_no', this.currentEmailRow.invoice_no)
+        formData.append('academic_year', this.currentEmailRow.academic_year || '')
+        
+        if (this.isResend) {
+          formData.append('force_resend', 'true')
+        }
+
+        // 添加附件
+        this.emailAttachmentList.forEach(file => {
+          formData.append('attachments', file.raw)
+        })
+
+        const data = await this.$http.post('/tuition/email/', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
           }
-        )
-
-        this.$message.info('邮件重新发送任务已启动...')
-
-        const data = await this.$http.post('/tuition/email/', {
-          action: 'send_single',
-          invoice_no: row.invoice_no,
-          force_resend: true  // 标记为强制重新发送
         })
 
         if (data.code === 1 || data.code === '1') {
           this.$notify({
-            title: '邮件重新发送成功',
-            message: `${row.invoice_no} 的学费邮件已重新发送`,
+            title: this.isResend ? '邮件重新发送成功' : '邮件发送成功',
+            message: `${this.currentEmailRow.invoice_no} 的学费邮件已${this.isResend ? '重新' : ''}发送`,
             type: 'success',
             duration: 5000,
             position: 'bottom-right'
           })
+          // 关闭对话框
+          this.emailDialogVisible = false
+          this.emailAttachmentList = []
           // 刷新列表以更新邮件状态
           this.getList()
         } else {
-          this.$message.error(data.message || '邮件重新发送失败')
+          this.$message.error(data.message || (this.isResend ? '邮件重新发送失败' : '邮件发送失败'))
         }
       } catch (error) {
-        if (error === 'cancel') {
-          return
-        }
-        console.error('邮件重新发送失败:', error)
-        this.$message.error('邮件重新发送失败：' + (error.message || '网络错误'))
+        console.error(this.isResend ? '邮件重新发送失败:' : '邮件发送失败:', error)
+        this.$message.error((this.isResend ? '邮件重新发送失败：' : '邮件发送失败：') + (error.message || '网络错误'))
+      } finally {
+        this.emailSending = false
       }
     },
 
