@@ -6,7 +6,13 @@
         <span>学费计算</span>
       </div>
       <el-form :inline="true" :model="calcForm" class="demo-form-inline">
-        <el-form-item label="选择学期：">
+        <el-form-item label="计算方式：">
+          <el-select v-model="calcForm.payment_type" placeholder="请选择计算方式" style="width: 120px;" @change="handlePaymentTypeChange">
+            <el-option label="全年" value="yearly" />
+            <el-option label="学期" value="semester" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="calcForm.payment_type === 'semester'" label="学期选择：">
           <el-select v-model="calcForm.semester_id" placeholder="请选择学期" style="width: 320px;">
             <el-option
               v-for="item in semesterOptions"
@@ -15,9 +21,6 @@
               :value="item.id"
             />
           </el-select>
-          <span v-if="currentSemesterConfig" class="form-tip" style="color: #67c23a;">
-            当前学期: {{ currentSemesterConfig.name }}
-          </span>
         </el-form-item>
         <el-form-item>
           <el-button type="primary" icon="el-icon-s-claim" @click="handleCalculateAll">计算所有家庭</el-button>
@@ -36,40 +39,14 @@
         <span>选择家庭</span>
       </div>
       <el-form :inline="true" class="demo-form-inline">
-        <el-form-item label="家庭支付方式：">
-          <el-select v-model="paymentTypeFilter" placeholder="全部家庭" clearable style="width: 180px;" @change="handlePaymentFilterChange">
-            <el-option label="全部家庭" value="" />
-            <el-option label="全部全年支付" value="all_yearly">
-              <span style="float: left">全部全年支付</span>
-              <span v-if="familyPaymentStats.all_yearly_count > 0" style="float: right; color: #8492a6; font-size: 13px">{{ familyPaymentStats.all_yearly_count }}个家庭</span>
-            </el-option>
-            <el-option label="全部学期支付" value="all_semester">
-              <span style="float: left">全部学期支付</span>
-              <span v-if="familyPaymentStats.all_semester_count > 0" style="float: right; color: #8492a6; font-size: 13px">{{ familyPaymentStats.all_semester_count }}个家庭</span>
-            </el-option>
-            <el-option label="混合支付" value="mixed">
-              <span style="float: left">混合支付</span>
-              <span v-if="familyPaymentStats.mixed_count > 0" style="float: right; color: #8492a6; font-size: 13px">{{ familyPaymentStats.mixed_count }}个家庭</span>
-            </el-option>
-          </el-select>
-        </el-form-item>
-
         <el-form-item label="家庭编号：">
-          <el-select v-model="selectedFamily" placeholder="请选择家庭" clearable filterable style="width: 200px;">
+          <el-select v-model="selectedFamily" placeholder="请选择家庭" clearable filterable style="width: 280px;">
             <el-option
-              v-for="item in filteredFamilyOptions"
+              v-for="item in familyOptions"
               :key="item.invoice_no || item"
               :label="item.invoice_no || item"
               :value="item.invoice_no || item"
-            >
-              <span style="float: left">{{ item.invoice_no || item }}</span>
-              <span v-if="item.payment_type" style="float: right; color: #8492a6; font-size: 13px">
-                <el-tag v-if="item.payment_type === 'all_yearly'" type="success" size="mini">全年</el-tag>
-                <el-tag v-else-if="item.payment_type === 'all_semester'" type="warning" size="mini">学期</el-tag>
-                <el-tag v-else type="info" size="mini">混合</el-tag>
-                {{ item.yearly_count }}/{{ item.semester_count }}
-              </span>
-            </el-option>
+            />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -656,22 +633,11 @@ export default {
     return {
       calcForm: {
         academic_year: '2026-2027',
-        semester_id: null  // null 表示使用当前学期（启用的配置）
+        semester_id: null,  // null 表示使用当前学期（启用的配置）
+        payment_type: 'yearly'  // 'yearly', 'semester'
       },
       selectedFamily: '',
       familyOptions: [],
-      familyPaymentOptions: {
-        all_yearly: [],
-        all_semester: [],
-        mixed: []
-      },
-      familyPaymentStats: {
-        all_yearly_count: 0,
-        all_semester_count: 0,
-        mixed_count: 0,
-        total: 0
-      },
-      paymentTypeFilter: '',
       semesterOptions: [],
       currentSemesterConfig: null,  // 当前启用的学期配置
       calculationResult: null,
@@ -739,21 +705,76 @@ export default {
       }
     }
   },
-  computed: {
-    filteredFamilyOptions() {
-      // 如果有支付方式筛选，返回对应的家庭列表
-      if (this.paymentTypeFilter && this.familyPaymentOptions[this.paymentTypeFilter]) {
-        return this.familyPaymentOptions[this.paymentTypeFilter]
-      }
-      // 否则直接返回家庭选项列表
-      return this.familyOptions
-    }
-  },
   created() {
     // 并行加载基础数据
     this.initPageData()
   },
   methods: {
+    // 获取实际的 payment_type（处理学期选择）
+    getActualPaymentType() {
+      if (this.calcForm.payment_type === 'semester') {
+        // 根据选中的学期配置确定是第一学期还是第二学期
+        const selectedSemester = this.semesterOptions.find(s => s.id === this.calcForm.semester_id)
+        if (selectedSemester) {
+          // semester 字段值: 'First', 'Second', 'Summer'
+          return selectedSemester.semester === 'First' ? 'semester_1' : 'semester_2'
+        }
+        return 'semester_1'
+      }
+      return this.calcForm.payment_type
+    },
+    
+    // 获取支付类型的显示文本
+    getPaymentTypeLabel() {
+      if (this.calcForm.payment_type === 'semester') {
+        const selectedSemester = this.semesterOptions.find(s => s.id === this.calcForm.semester_id)
+        if (selectedSemester) {
+          // semester 字段值: 'First', 'Second', 'Summer'
+          return selectedSemester.semester === 'First' ? '第一学期' : '第二学期'
+        }
+        return '学期'
+      }
+      return '全年'
+    },
+    
+    // 处理计算方式变化
+    handlePaymentTypeChange(value) {
+      // 切换时保持学期选择不变
+    },
+    
+    // 验证计算表单
+    validateCalcForm() {
+      if (!this.calcForm.payment_type) {
+        this.$message.warning('请选择计算方式')
+        return false
+      }
+      
+      if (!this.calcForm.semester_id) {
+        this.$message.warning('请选择学期')
+        return false
+      }
+      
+      return true
+    },
+    
+    // 构建计算请求参数
+    buildCalcParams(extraParams = {}) {
+      const params = {
+        academic_year: this.calcForm.academic_year,
+        payment_type: this.getActualPaymentType(),
+        ...extraParams
+      }
+      
+      // 使用选中的学期ID（默认是当前学期）
+      if (this.calcForm.semester_id) {
+        params.semester_id = this.calcForm.semester_id
+      } else if (this.currentSemesterConfig) {
+        params.semester_id = this.currentSemesterConfig.id
+      }
+      
+      return params
+    },
+    
     // 初始化页面数据（并行加载）
     async initPageData() {
       console.log('开始加载学费计算页面数据...')
@@ -762,8 +783,7 @@ export default {
       // 并行加载基础数据
       await Promise.all([
         this.getFamilyOptions(),
-        this.getSemesterOptions(),
-        this.getFamilyPaymentTypes()
+        this.getSemesterOptions()
       ])
       
       const endTime = Date.now()
@@ -803,46 +823,6 @@ export default {
       }
     },
     
-    async getFamilyPaymentTypes() {
-      try {
-        const res = await this.$http.get('/tuition/calculate/', { params: { type: 'family_payment_types' }})
-        
-        if (res.data && res.data.families) {
-          // 直接使用后端返回的家庭列表，不再根据学费信息过滤
-          this.familyPaymentOptions = {
-            all_yearly: res.data.families.all_yearly || [],
-            all_semester: res.data.families.all_semester || [],
-            mixed: res.data.families.mixed || []
-          }
-          
-          this.familyPaymentStats = {
-            all_yearly_count: this.familyPaymentOptions.all_yearly.length,
-            all_semester_count: this.familyPaymentOptions.all_semester.length,
-            mixed_count: this.familyPaymentOptions.mixed.length,
-            total: this.familyPaymentOptions.all_yearly.length + 
-                   this.familyPaymentOptions.all_semester.length + 
-                   this.familyPaymentOptions.mixed.length
-          }
-        }
-      } catch (error) {
-        console.error('获取家庭支付方式筛选失败:', error)
-      }
-    },
-    handlePaymentFilterChange(value) {
-      // 当选择支付方式筛选时，重置选中的家庭
-      this.selectedFamily = ''
-      if (value && this.familyPaymentOptions[value] && this.familyPaymentOptions[value].length > 0) {
-        this.$message.success(`已筛选出 ${this.familyPaymentOptions[value].length} 个${this.getPaymentTypeLabel(value)}的家庭`)
-      }
-    },
-    getPaymentTypeLabel(type) {
-      const labels = {
-        'all_yearly': '全部全年支付',
-        'all_semester': '全部学期支付',
-        'mixed': '混合支付'
-      }
-      return labels[type] || type
-    },
     async getSemesterOptions() {
       try {
         // 获取所有启用的学期
@@ -874,21 +854,11 @@ export default {
       }
     },
     async handleCalculateAll() {
+      if (!this.validateCalcForm()) return
+      
       try {
-        const params = {
-          action: 'calculate_all',
-          academic_year: this.calcForm.academic_year
-        }
-        
-        // 使用选中的学期ID（默认是当前学期）
-        if (this.calcForm.semester_id) {
-          params.semester_id = this.calcForm.semester_id
-          console.log('使用学期ID:', this.calcForm.semester_id)
-        } else if (this.currentSemesterConfig) {
-          // 如果没有选中且存在当前学期配置，使用当前学期
-          params.semester_id = this.currentSemesterConfig.id
-          console.log('使用当前学期:', this.currentSemesterConfig.name)
-        }
+        const params = this.buildCalcParams({ action: 'calculate_all' })
+        console.log('计算所有家庭，参数:', params, '显示:', this.getPaymentTypeLabel())
         
         const res = await this.$http.post('/tuition/calculate/', params)
         this.calculationResult = res.data
@@ -910,22 +880,15 @@ export default {
         this.$message.warning('请选择家庭')
         return
       }
+      
+      if (!this.validateCalcForm()) return
+      
       try {
-        const params = {
+        const params = this.buildCalcParams({ 
           action: 'calculate_family',
-          invoice_no: this.selectedFamily,
-          academic_year: this.calcForm.academic_year
-        }
-        
-        // 使用选中的学期ID（默认是当前学期）
-        if (this.calcForm.semester_id) {
-          params.semester_id = this.calcForm.semester_id
-          console.log('使用学期ID:', this.calcForm.semester_id)
-        } else if (this.currentSemesterConfig) {
-          // 如果没有选中且存在当前学期配置，使用当前学期
-          params.semester_id = this.currentSemesterConfig.id
-          console.log('使用当前学期:', this.currentSemesterConfig.name)
-        }
+          invoice_no: this.selectedFamily 
+        })
+        console.log('计算选中家庭，参数:', params)
         
         const res = await this.$http.post('/tuition/calculate/', params)
         this.calculationResult = res.data
@@ -944,7 +907,6 @@ export default {
     },
     handleReset() {
       this.selectedFamily = ''
-      this.paymentTypeFilter = ''
       this.calculationResult = null
     },
     // 打开发送邮件对话框
@@ -979,6 +941,7 @@ export default {
         const formData = new FormData()
         formData.append('action', 'send_single')
         formData.append('invoice_no', this.currentEmailFamily.invoice_no)
+        formData.append('payment_type', this.getActualPaymentType())
 
         // 添加附件
         this.emailAttachmentList.forEach(file => {
@@ -1113,6 +1076,7 @@ export default {
         // 构建FormData
         const formData = new FormData()
         formData.append('action', 'send_batch')
+        formData.append('payment_type', this.getActualPaymentType())
         // 使用 JSON 字符串发送数组，后端更可靠地解析
         formData.append('invoice_nos', JSON.stringify(invoiceNos))
 
@@ -1185,6 +1149,7 @@ export default {
         // 构建FormData
         const formData = new FormData()
         formData.append('action', 'send_batch')
+        formData.append('payment_type', this.getActualPaymentType())
 
         // 添加附件
         this.batchEmailAttachmentList.forEach(file => {
@@ -1228,7 +1193,8 @@ export default {
       try {
         const res = await this.$http.post('/tuition/email/', {
           action: 'preview_pdf',
-          invoice_no: family.invoice_no
+          invoice_no: family.invoice_no,
+          payment_type: this.getActualPaymentType()
         }, { responseType: 'blob' })
         // http拦截器返回的是整个response对象，需要取data
         const blob = res.data || res
@@ -1540,86 +1506,30 @@ export default {
     // 一键下载所有PDF
     async handleDownloadAllPdfs() {
       try {
-        await this.$confirm('即将分批下载所有家庭的学费PDF文件，每批50个家庭，打包成zip格式。请耐心等待。', '确认下载', {
-          confirmButtonText: '确认下载',
-          cancelButtonText: '取消',
-          type: 'info'
-        })
-
-        const batchSize = 50
-        let batchIndex = 0
-        let totalBatches = null
-        let totalGenerated = 0
-        let totalFailed = 0
+        await this.$confirm(
+          '即将分批下载所有家庭的学费PDF文件，每批50个家庭，打包成zip格式。请耐心等待。', 
+          '确认下载', 
+          { confirmButtonText: '确认下载', cancelButtonText: '取消', type: 'info' }
+        )
 
         this.$message.info('开始批量下载PDF文件...')
-
-        do {
-          this.downloadAllLoading = true
-
-          // 发送分批请求
-          const response = await this.$http.post('/tuition/email/', {
-            action: 'download_all_pdfs',
-            batch_size: batchSize,
-            batch_index: batchIndex
-          }, {
-            responseType: 'blob'
-          })
-
-          // 从响应头获取批次信息
-          totalBatches = parseInt(response.headers['x-total-batches'] || 1)
-          const generatedCount = parseInt(response.headers['x-generated-count'] || 0)
-          const failedCount = parseInt(response.headers['x-failed-count'] || 0)
-
-          totalGenerated += generatedCount
-          totalFailed += failedCount
-
-          // 获取文件名
-          const contentDisposition = response.headers['content-disposition']
-          let filename = `Tuition_Batch_${batchIndex + 1}_of_${totalBatches}.zip`
-          if (contentDisposition) {
-            const filenameMatch = contentDisposition.match(/filename="?(.+?)"?$/)
-            if (filenameMatch) {
-              filename = filenameMatch[1]
+        
+        await this.batchDownloadPdfs(
+          {},
+          {
+            loadingKey: 'downloadAllLoading',
+            defaultFilename: 'Tuition_Batch',
+            onComplete: (totalGenerated, totalFailed) => {
+              let msg = `全部下载完成！总共生成 ${totalGenerated} 个PDF文件`
+              if (totalFailed > 0) msg += `，${totalFailed} 个失败`
+              this.$message.success(msg)
             }
           }
-
-          // 下载文件
-          const blob = new Blob([response.data], { type: 'application/zip' })
-          const url = window.URL.createObjectURL(blob)
-          const link = document.createElement('a')
-          link.href = url
-          link.download = filename
-          document.body.appendChild(link)
-          link.click()
-          document.body.removeChild(link)
-          window.URL.revokeObjectURL(url)
-
-          // 显示进度
-          this.$message.success(`第 ${batchIndex + 1}/${totalBatches} 批下载完成，本批生成 ${generatedCount} 个PDF`)
-
-          batchIndex++
-
-          // 添加小延迟，避免浏览器拦截
-          if (batchIndex < totalBatches) {
-            await new Promise(resolve => setTimeout(resolve, 1000))
-          }
-        } while (batchIndex < totalBatches)
-
-        // 显示总结消息
-        let msg = `全部下载完成！总共生成 ${totalGenerated} 个PDF文件`
-        if (totalFailed > 0) {
-          msg += `，${totalFailed} 个失败`
-        }
-        this.$message.success(msg)
+        )
       } catch (error) {
-        if (error === 'cancel') {
-          return
-        }
+        if (error === 'cancel') return
         console.error('下载失败:', error)
         this.$message.error('下载失败：' + (error.message || '网络错误'))
-      } finally {
-        this.downloadAllLoading = false
       }
     },
 
@@ -1666,6 +1576,96 @@ export default {
       }
     },
 
+    // 下载Blob文件
+    downloadBlob(blob, filename) {
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+    },
+
+    // 从响应头获取文件名
+    getFilenameFromResponse(response, defaultName) {
+      const contentDisposition = response.headers['content-disposition']
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="?(.+?)"?$/)
+        if (match) return match[1]
+      }
+      return defaultName
+    },
+
+    // 批量下载PDF的公共方法
+    async batchDownloadPdfs(requestData, options = {}) {
+      const {
+        loadingKey = 'downloadLoading',
+        defaultFilename = 'Tuition_Batch',
+        onProgress = null,
+        onComplete = null
+      } = options
+
+      const batchSize = 50
+      let batchIndex = 0
+      let totalBatches = null
+      let totalGenerated = 0
+      let totalFailed = 0
+
+      if (loadingKey && this[loadingKey] !== undefined) {
+        this[loadingKey] = true
+      }
+
+      try {
+        do {
+          const response = await this.$http.post('/tuition/email/', {
+            action: 'download_all_pdfs',
+            batch_size: batchSize,
+            batch_index: batchIndex,
+            payment_type: this.getActualPaymentType(),
+            ...requestData
+          }, { responseType: 'blob' })
+
+          totalBatches = parseInt(response.headers['x-total-batches'] || 1)
+          const generatedCount = parseInt(response.headers['x-generated-count'] || 0)
+          const failedCount = parseInt(response.headers['x-failed-count'] || 0)
+
+          totalGenerated += generatedCount
+          totalFailed += failedCount
+
+          const filename = this.getFilenameFromResponse(
+            response, 
+            `${defaultFilename}_${batchIndex + 1}_of_${totalBatches}.zip`
+          )
+
+          this.downloadBlob(new Blob([response.data], { type: 'application/zip' }), filename)
+
+          if (onProgress) {
+            onProgress(batchIndex + 1, totalBatches, generatedCount)
+          } else {
+            this.$message.success(`第 ${batchIndex + 1}/${totalBatches} 批下载完成，本批生成 ${generatedCount} 个PDF`)
+          }
+
+          batchIndex++
+          
+          if (batchIndex < totalBatches) {
+            await new Promise(resolve => setTimeout(resolve, 1000))
+          }
+        } while (batchIndex < totalBatches)
+
+        if (onComplete) {
+          onComplete(totalGenerated, totalFailed)
+        }
+
+        return { totalGenerated, totalFailed }
+      } finally {
+        if (loadingKey && this[loadingKey] !== undefined) {
+          this[loadingKey] = false
+        }
+      }
+    },
+
     // 下载单个家庭PDF
     async handleDownloadSinglePdf(family) {
       try {
@@ -1675,31 +1675,12 @@ export default {
           action: 'download_all_pdfs',
           invoice_nos: [family.invoice_no],
           batch_size: 1,
-          batch_index: 0
-        }, {
-          responseType: 'blob'
-        })
+          batch_index: 0,
+          payment_type: this.getActualPaymentType()
+        }, { responseType: 'blob' })
 
-        // 获取文件名
-        const contentDisposition = response.headers['content-disposition']
-        let filename = `${family.invoice_no}.zip`
-        if (contentDisposition) {
-          const filenameMatch = contentDisposition.match(/filename="?(.+?)"?$/)
-          if (filenameMatch) {
-            filename = filenameMatch[1]
-          }
-        }
-
-        // 下载文件
-        const blob = new Blob([response.data], { type: 'application/zip' })
-        const url = window.URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = url
-        link.download = filename
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        window.URL.revokeObjectURL(url)
+        const filename = this.getFilenameFromResponse(response, `${family.invoice_no}.zip`)
+        this.downloadBlob(new Blob([response.data], { type: 'application/zip' }), filename)
 
         this.$message.success(`${family.invoice_no} PDF下载成功`)
       } catch (error) {
@@ -1716,95 +1697,31 @@ export default {
       }
 
       try {
-        await this.$confirm(`即将下载选中的 ${this.selectedFamilies.length} 个家庭的PDF文件，打包成zip格式。请稍候...`, '确认下载', {
-          confirmButtonText: '确认下载',
-          cancelButtonText: '取消',
-          type: 'info'
-        })
+        await this.$confirm(
+          `即将下载选中的 ${this.selectedFamilies.length} 个家庭的PDF文件，打包成zip格式。请稍候...`, 
+          '确认下载', 
+          { confirmButtonText: '确认下载', cancelButtonText: '取消', type: 'info' }
+        )
 
         const invoiceNos = this.selectedFamilies.map(f => f.invoice_no)
-        const batchSize = 50
-        let batchIndex = 0
-        let totalBatches = null
-        let totalGenerated = 0
-        let totalFailed = 0
-
-        this.downloadSelectedLoading = true
-        this.$message.info('开始下载选中家庭的PDF文件...')
-
-        do {
-          const response = await this.$http.post('/tuition/email/', {
-            action: 'download_all_pdfs',
-            invoice_nos: invoiceNos,
-            batch_size: batchSize,
-            batch_index: batchIndex
-          }, {
-            responseType: 'blob'
-          })
-
-          totalBatches = parseInt(response.headers['x-total-batches'] || 1)
-          const generatedCount = parseInt(response.headers['x-generated-count'] || 0)
-          const failedCount = parseInt(response.headers['x-failed-count'] || 0)
-
-          totalGenerated += generatedCount
-          totalFailed += failedCount
-
-          // 获取文件名
-          const contentDisposition = response.headers['content-disposition']
-          let filename = `Tuition_Selected_Batch_${batchIndex + 1}_of_${totalBatches}.zip`
-          if (contentDisposition) {
-            const filenameMatch = contentDisposition.match(/filename="?(.+?)"?$/)
-            if (filenameMatch) {
-              filename = filenameMatch[1]
+        
+        await this.batchDownloadPdfs(
+          { invoice_nos: invoiceNos },
+          {
+            loadingKey: 'downloadSelectedLoading',
+            defaultFilename: 'Tuition_Selected_Batch',
+            onComplete: (totalGenerated, totalFailed) => {
+              let msg = `选中家庭下载完成！总共生成 ${totalGenerated} 个PDF文件`
+              if (totalFailed > 0) msg += `，${totalFailed} 个失败`
+              this.$message.success(msg)
+              this.handleClearSelection()
             }
           }
-
-          // 下载文件
-          const blob = new Blob([response.data], { type: 'application/zip' })
-          const url = window.URL.createObjectURL(blob)
-          const link = document.createElement('a')
-          link.href = url
-          link.download = filename
-          document.body.appendChild(link)
-          link.click()
-          document.body.removeChild(link)
-          window.URL.revokeObjectURL(url)
-
-          // 显示进度
-          this.$message.success(`第 ${batchIndex + 1}/${totalBatches} 批下载完成，本批生成 ${generatedCount} 个PDF`)
-
-          batchIndex++
-
-          // 添加小延迟
-          if (batchIndex < totalBatches) {
-            await new Promise(resolve => setTimeout(resolve, 1000))
-          }
-        } while (batchIndex < totalBatches)
-
-        // 显示总结消息
-        let msg = `选中家庭下载完成！总共生成 ${totalGenerated} 个PDF文件`
-        if (totalFailed > 0) {
-          msg += `，${totalFailed} 个失败`
-        }
-        this.$message.success(msg)
-
-        // 下载完成后清空选择（不刷新页面）
-        this.selectedFamilies = []
-        this.isSelectAll = false
-        if (this.calculationResult?.families) {
-          // 使用 Vue.set 确保响应式更新
-          this.calculationResult.families.forEach((family, index) => {
-            this.$set(this.calculationResult.families[index], 'isSelected', false)
-          })
-        }
+        )
       } catch (error) {
-        if (error === 'cancel') {
-          return
-        }
+        if (error === 'cancel') return
         console.error('下载失败:', error)
         this.$message.error('下载失败：' + (error.message || '网络错误'))
-      } finally {
-        this.downloadSelectedLoading = false
       }
     }
   },
