@@ -69,7 +69,7 @@
           <el-descriptions-item label="学期">{{ calculationResult.semester_config?.name || '当前学期' }}</el-descriptions-item>
           <el-descriptions-item label="家庭数量">{{ calculationResult.family_count }}</el-descriptions-item>
           <el-descriptions-item label="学生总数">{{ calculationResult.total_students }}</el-descriptions-item>
-          <el-descriptions-item label="学期日期" :span="2">{{ calculationResult.semester_config?.start_date }} 至 {{ calculationResult.semester_config?.end_date }}</el-descriptions-item>
+          <el-descriptions-item :label="calcForm.payment_type === 'yearly' ? '学年日期' : '学期日期'" :span="2">{{ calculationResult.semester_config?.start_date }} 至 {{ calculationResult.semester_config?.end_date }}</el-descriptions-item>
           <el-descriptions-item label="总金额">
             <span class="amount-text" style="font-size: 16px;">¥{{ calculationResult.total_amount }}</span>
           </el-descriptions-item>
@@ -185,7 +185,7 @@
             <span class="amount-text" style="font-size: 16px;">¥{{ calculationResult.final_total }}</span>
           </el-descriptions-item>
           <el-descriptions-item label="学期">{{ calculationResult.semester_config?.name || '当前学期' }}</el-descriptions-item>
-          <el-descriptions-item label="学期日期" :span="2">{{ calculationResult.semester_config?.start_date }} 至 {{ calculationResult.semester_config?.end_date }}</el-descriptions-item>
+          <el-descriptions-item :label="calcForm.payment_type === 'yearly' ? '学年日期' : '学期日期'" :span="2">{{ calculationResult.semester_config?.start_date }} 至 {{ calculationResult.semester_config?.end_date }}</el-descriptions-item>
         </el-descriptions>
 
         <el-table :data="calculationResult.students" border style="width: 100%; margin-bottom: 15px;">
