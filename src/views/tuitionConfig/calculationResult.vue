@@ -3,7 +3,7 @@
     <!-- 计算条件 -->
     <el-card class="filter-container search-header" shadow="never">
       <div slot="header" class="clearfix">
-        <span>学费计算</span>
+        <span>学费单制作</span>
       </div>
       <el-form :inline="true" :model="calcForm" class="demo-form-inline">
         <el-form-item label="计算方式：">
@@ -23,7 +23,7 @@
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" icon="el-icon-s-claim" @click="handleCalculateAll">计算所有家庭</el-button>
+          <el-button type="primary" icon="el-icon-s-claim" @click="handleCalculateAll">制作所有学费单</el-button>
           <el-button type="success" icon="el-icon-message" @click="handleSendBatchEmail">批量发送邮件</el-button>
           <el-button type="warning" icon="el-icon-download" :loading="downloadAllLoading" @click="handleDownloadAllPdfs">一键下载所有PDF</el-button>
           <el-button type="warning" icon="el-icon-download" :loading="downloadSelectedLoading" :disabled="selectedFamilies.length === 0" @click="handleDownloadSelectedPdfs">下载选中({{ selectedFamilies.length }})</el-button>
@@ -40,7 +40,15 @@
       </div>
       <el-form :inline="true" class="demo-form-inline">
         <el-form-item label="家庭编号：">
-          <el-select v-model="selectedFamily" placeholder="请选择家庭" clearable filterable style="width: 280px;">
+          <el-select 
+            v-model="selectedFamilyList" 
+            placeholder="请选择家庭（可多选）" 
+            clearable 
+            filterable 
+            multiple 
+            collapse-tags
+            style="width: 320px;"
+          >
             <el-option
               v-for="item in familyOptions"
               :key="item.invoice_no || item"
@@ -50,17 +58,17 @@
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" icon="el-icon-search" @click="handleCalculateFamily">计算选中家庭</el-button>
-          <el-button type="success" icon="el-icon-message" :disabled="selectedFamilies.length === 0" @click="handleSendSelectedBatchEmail">发送选中({{ selectedFamilies.length }})</el-button>
+          <el-button type="primary" icon="el-icon-search" :disabled="selectedFamilyList.length === 0" @click="handleCalculateFamily">制作选中学费单({{ selectedFamilyList.length }})</el-button>
+          <el-button type="success" icon="el-icon-message" :disabled="selectedFamilyList.length === 0" @click="handleSendBatchEmailFromList">发送选中({{ selectedFamilyList.length }})</el-button>
           <el-button icon="el-icon-refresh" @click="handleReset">重置</el-button>
         </el-form-item>
       </el-form>
     </el-card>
 
-    <!-- 计算结果 -->
+    <!-- 制作结果 -->
     <el-card v-if="calculationResult" class="result-container" shadow="never" style="margin-top: 15px; max-height: calc(100vh - 350px); overflow-y: auto;">
       <div slot="header" class="clearfix">
-        <span>计算结果</span>
+        <span>制作结果</span>
         <el-button style="float: right; padding: 3px 0" type="text" @click="handleExportResult">导出结果</el-button>
       </div>
 
@@ -636,7 +644,7 @@ export default {
         semester_id: null,  // null 表示使用当前学期（启用的配置）
         payment_type: 'yearly'  // 'yearly', 'semester'
       },
-      selectedFamily: '',
+      selectedFamilyList: [],  // 多选家庭列表
       familyOptions: [],
       semesterOptions: [],
       currentSemesterConfig: null,  // 当前启用的学期配置
@@ -876,37 +884,69 @@ export default {
       }
     },
     async handleCalculateFamily() {
-      if (!this.selectedFamily) {
+      if (this.selectedFamilyList.length === 0) {
         this.$message.warning('请选择家庭')
         return
       }
       
       if (!this.validateCalcForm()) return
       
+      this.calculateLoading = true
       try {
+        // 使用批量计算接口
         const params = this.buildCalcParams({ 
-          action: 'calculate_family',
-          invoice_no: this.selectedFamily 
+          action: 'calculate_batch',
+          invoice_nos: this.selectedFamilyList
         })
-        console.log('计算选中家庭，参数:', params)
+        console.log('批量制作学费单，参数:', params)
         
         const res = await this.$http.post('/tuition/calculate/', params)
-        this.calculationResult = res.data
+        console.log('批量制作响应:', res)
         
-        // 如果后端返回的学期配置不是当前学期，显示提示
-        if (this.calculationResult.semester_config && 
-            this.currentSemesterConfig && 
-            this.calculationResult.semester_config.id !== this.currentSemesterConfig.id) {
-          this.$message.info('使用的是非当前学期的配置')
+        // 检查响应格式 (res 已经是 response.data)
+        if (!res.data) {
+          console.error('响应格式错误:', res)
+          this.$message.error('响应格式错误')
+          return
         }
         
-        this.$message.success('计算完成')
+        // 构建与 calculate_all 兼容的数据结构
+        this.calculationResult = {
+          family_count: res.data.family_count || 0,
+          total_amount: res.data.total_amount || 0,
+          families: res.data.families || [],
+          payment_type: this.calcForm.payment_type,
+          semester_config: this.currentSemesterConfig
+        }
+        
+        // 如果后端返回的学期配置不是当前学期，显示提示
+        if (this.calculationResult.families && this.calculationResult.families.length > 0) {
+          const firstFamilySemester = this.calculationResult.families[0].semester_config
+          if (firstFamilySemester && 
+              this.currentSemesterConfig && 
+              firstFamilySemester.id !== this.currentSemesterConfig.id) {
+            this.$message.info('使用的是非当前学期的配置')
+          }
+        }
+        
+        // 显示错误信息（如果有）
+        if (res.data.errors && res.data.errors.length > 0) {
+          const errorCount = res.data.errors.length
+          this.$message.warning(`${errorCount} 个家庭制作失败，请检查家庭编号`)
+          console.warn('制作失败的家庭:', res.data.errors)
+        }
+        
+        this.$message.success(`成功制作 ${res.data.family_count} 个家庭的学费单`)
       } catch (error) {
-        this.$message.error('计算失败')
+        this.$message.error('制作失败: ' + (error.message || '未知错误'))
+        console.error('批量制作失败:', error)
+        console.error('错误详情:', error.response?.data || error)
+      } finally {
+        this.calculateLoading = false
       }
     },
     handleReset() {
-      this.selectedFamily = ''
+      this.selectedFamilyList = []
       this.calculationResult = null
     },
     // 打开发送邮件对话框
@@ -1041,7 +1081,21 @@ export default {
       this.batchEmailDialogVisible = true
     },
 
-    // 打开发送选中家庭的对话框
+    // 从选择列表打开发送邮件对话框
+    handleSendBatchEmailFromList() {
+      if (this.selectedFamilyList.length === 0) {
+        this.$message.warning('请先选择要发送邮件的家庭')
+        return
+      }
+      // 将选择列表的家庭转换为selectedFamilies格式
+      this.selectedFamilies = this.selectedFamilyList.map(invoiceNo => ({
+        invoice_no: invoiceNo
+      }))
+      this.selectedBatchEmailAttachmentList = []
+      this.selectedBatchEmailDialogVisible = true
+    },
+
+    // 打开发送选中家庭的对话框（结果区域勾选）
     handleSendSelectedBatchEmail() {
       if (this.selectedFamilies.length === 0) {
         this.$message.warning('请先选择要发送邮件的家庭')

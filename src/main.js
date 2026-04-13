@@ -6,6 +6,8 @@ import ElementUI from 'element-ui'
 import 'element-ui/lib/theme-chalk/index.css'
 import locale from 'element-ui/lib/locale/lang/zh-CN'
 
+import * as echarts from 'echarts'
+
 import '@/styles/index.scss'
 
 import App from './App'
@@ -20,6 +22,7 @@ Vue.use(ElementUI, { locale })
 
 Vue.config.productionTip = false
 Vue.prototype.$http = http
+Vue.prototype.$echarts = echarts
 
 new Vue({
   el: '#app',

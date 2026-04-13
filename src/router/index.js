@@ -75,7 +75,29 @@ export const constantRoutes = [
       path: 'index',
       name: 'TuitionCalculation',
       component: () => import('@/views/tuitionConfig/calculationResult'),
-      meta: { title: '学费计算', icon: 'el-icon-s-order' }
+      meta: { title: '学费单制作', icon: 'el-icon-s-order' }
+    }]
+  },
+
+  {
+    path: '/tuition-payment',
+    component: Layout,
+    children: [{
+      path: 'index',
+      name: 'TuitionPayment',
+      component: () => import('@/views/tuitionPayment/index'),
+      meta: { title: '缴费管理', icon: 'el-icon-money' }
+    }]
+  },
+
+  {
+    path: '/statistics',
+    component: Layout,
+    children: [{
+      path: 'index',
+      name: 'TuitionStatistics',
+      component: () => import('@/views/statistics/index'),
+      meta: { title: '学费统计', icon: 'el-icon-s-data' }
     }]
   },
 
