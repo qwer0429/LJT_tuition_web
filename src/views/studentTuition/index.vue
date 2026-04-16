@@ -97,7 +97,7 @@
           </template>
         </el-table-column>
         <el-table-column label="年级" prop="grade" align="center" min-width="100" />
-        <el-table-column label="家庭编号" prop="invoice_no" align="center" min-width="120" />
+        <el-table-column label="家庭编号" prop="family_number" align="center" min-width="120" />
         <el-table-column label="学年" prop="academic_year" align="center" width="100" />
         <el-table-column label="出生日期" align="center" width="110">
           <template slot-scope="scope">
@@ -396,7 +396,7 @@
     <el-dialog :title="isResend ? '重新发送学费邮件' : '发送学费邮件'" :visible.sync="emailDialogVisible" width="600px">
       <el-form label-width="100px" v-if="currentEmailRow">
         <el-form-item label="家庭编号">
-          <span>{{ currentEmailRow.invoice_no }}</span>
+          <span>{{ currentEmailRow.family_number || currentEmailRow.invoice_no }}</span>
         </el-form-item>
         <el-form-item label="学生">
           <span>{{ currentEmailRow.student_name || currentEmailRow.student_english_name || '-' }}</span>
@@ -436,7 +436,7 @@
         <!-- 学生基本信息 -->
         <el-descriptions :column="2" border title="学生信息">
           <el-descriptions-item label="学生">{{ detailData.student_name }}</el-descriptions-item>
-          <el-descriptions-item label="家庭编号">{{ detailData.invoice_no }}</el-descriptions-item>
+          <el-descriptions-item label="家庭编号">{{ detailData.family_number || detailData.invoice_no }}</el-descriptions-item>
           <el-descriptions-item label="年级">{{ detailData.grade }}</el-descriptions-item>
           <el-descriptions-item label="学年">{{ detailData.academic_year }}</el-descriptions-item>
         </el-descriptions>
@@ -584,9 +584,9 @@ export default {
       }
     }
   },
-  created() {
-    // 初始化默认学年
-    this.initDefaultAcademicYear()
+  async created() {
+    // 初始化默认学年（从计算规则配置中获取启用的学年）
+    await this.initDefaultAcademicYear()
     // 加载列表数据和学生选项（并行）
     this.initPageData()
   },
@@ -604,12 +604,43 @@ export default {
       return `${currentYear}-${nextYear}`
     },
 
-    // 初始化默认学年
-    initDefaultAcademicYear() {
-      const defaultYear = this.getDefaultAcademicYear()
-      this.importForm.academic_year = defaultYear
-      this.tuitionForm.academic_year = defaultYear
-      console.log('默认学年:', defaultYear)
+    // 初始化默认学年（从计算规则配置中获取启用的学年）
+    async initDefaultAcademicYear() {
+      try {
+        const res = await this.$http.get('/tuitioncalculationconfig/')
+        let configs = []
+        if (Array.isArray(res)) {
+          configs = res
+        } else if (res.results && Array.isArray(res.results)) {
+          configs = res.results
+        } else if (res.data && Array.isArray(res.data)) {
+          configs = res.data
+        }
+
+        // 提取所有学年选项并排序（降序）
+        const years = new Set()
+        configs.forEach(item => {
+          if (item.academic_year) years.add(item.academic_year)
+        })
+        if (years.size > 0) {
+          this.academicYearOptions = Array.from(years).sort((a, b) => b.localeCompare(a))
+        }
+
+        // 获取启用的配置
+        const activeConfig = configs.find(c => c.is_active)
+        const defaultYear = activeConfig ? activeConfig.academic_year : this.getDefaultAcademicYear()
+
+        this.listQuery.academic_year = defaultYear
+        this.importForm.academic_year = defaultYear
+        this.tuitionForm.academic_year = defaultYear
+        console.log('默认启用学年:', defaultYear)
+      } catch (error) {
+        console.error('获取默认学年失败:', error)
+        const fallbackYear = this.getDefaultAcademicYear()
+        this.listQuery.academic_year = fallbackYear
+        this.importForm.academic_year = fallbackYear
+        this.tuitionForm.academic_year = fallbackYear
+      }
     },
 
     // 初始化页面数据（并行加载）
@@ -651,6 +682,10 @@ export default {
           years.add(item.academic_year)
         }
       })
+      // 确保当前筛选的默认学年也在选项中
+      if (this.listQuery.academic_year) {
+        years.add(this.listQuery.academic_year)
+      }
       // 转为数组并按降序排序
       this.academicYearOptions = Array.from(years).sort().reverse()
       console.log('提取的学年列表:', this.academicYearOptions)

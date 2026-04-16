@@ -29,6 +29,13 @@ module.exports = {
         pathRewrite: {
           '^/sljt': '/sljt'
         }
+      },
+      '/media': {
+        target: 'http://localhost:9000',
+        changeOrigin: true,
+        pathRewrite: {
+          '^/media': '/media'
+        }
       }
     }
   },

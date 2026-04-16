@@ -160,7 +160,9 @@
           </el-upload>
         </el-form-item>
         <el-form-item label="学年" prop="academic_year">
-          <el-input v-model="importForm.academic_year" placeholder="如：2026-2027" />
+          <el-select v-model="importForm.academic_year" placeholder="选择学年" style="width: 100%;">
+            <el-option v-for="year in academicYearOptions" :key="year" :label="year" :value="year" />
+          </el-select>
         </el-form-item>
         <el-form-item label="学期类型" prop="semester_type">
           <el-select v-model="importForm.semester_type" placeholder="选择学期" style="width: 100%;">
@@ -258,12 +260,13 @@ export default {
         end_date: ''
       },
       importRules: {
-        academic_year: [{ required: true, message: '请输入学年', trigger: 'blur' }],
+        academic_year: [{ required: true, message: '请选择学年', trigger: 'change' }],
         semester_type: [{ required: true, message: '请选择学期类型', trigger: 'change' }],
         start_date: [{ required: true, message: '请选择开始日期', trigger: 'change' }],
         end_date: [{ required: true, message: '请选择结束日期', trigger: 'change' }]
       },
-      importResult: null
+      importResult: null,
+      academicYearOptions: []
     }
   },
   created() {
@@ -604,7 +607,7 @@ export default {
     },
 
     // 打开导入校历对话框
-    handleImport() {
+    async handleImport() {
       this.importDialogVisible = true
       this.importResult = null
       this.importForm = {
@@ -613,6 +616,22 @@ export default {
         semester_type: '',
         start_date: '',
         end_date: ''
+      }
+      // 加载计算规则中的学年列表
+      try {
+        const res = await this.$http.get('/tuitioncalculationconfig/')
+        let configs = []
+        if (Array.isArray(res)) configs = res
+        else if (res.results && Array.isArray(res.results)) configs = res.results
+        else if (res.data && Array.isArray(res.data)) configs = res.data
+        const years = configs.map(c => c.academic_year).filter(Boolean)
+        this.academicYearOptions = [...new Set(years)]
+        const activeConfig = configs.find(c => c.is_active)
+        if (activeConfig && activeConfig.academic_year) {
+          this.importForm.academic_year = activeConfig.academic_year
+        }
+      } catch (e) {
+        console.error('加载计算规则学年失败', e)
       }
       this.$nextTick(() => {
         this.$refs.importForm && this.$refs.importForm.clearValidate()

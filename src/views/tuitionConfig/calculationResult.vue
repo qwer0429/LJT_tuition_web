@@ -783,19 +783,45 @@ export default {
       return params
     },
     
-    // 初始化页面数据（并行加载）
+    // 初始化页面数据
     async initPageData() {
       console.log('开始加载学费计算页面数据...')
       const startTime = Date.now()
       
-      // 并行加载基础数据
-      await Promise.all([
-        this.getFamilyOptions(),
-        this.getSemesterOptions()
-      ])
+      // 1. 先获取计算规则配置中的启用学年
+      await this.getActiveCalculationConfig()
+      // 2. 再加载学期选项
+      await this.getSemesterOptions()
+      // 3. 最后按启用学年加载家庭列表
+      await this.getFamilyOptions()
       
       const endTime = Date.now()
       console.log(`学费计算页面数据加载完成，耗时: ${endTime - startTime}ms`)
+    },
+
+    // 获取当前启用的计算规则配置学年
+    async getActiveCalculationConfig() {
+      try {
+        const res = await this.$http.get('/tuitioncalculationconfig/')
+        let configs = []
+        if (Array.isArray(res)) {
+          configs = res
+        } else if (res.results && Array.isArray(res.results)) {
+          configs = res.results
+        } else if (res.data && Array.isArray(res.data)) {
+          configs = res.data
+        }
+
+        const activeConfig = configs.find(c => c.is_active)
+        if (activeConfig && activeConfig.academic_year) {
+          this.calcForm.academic_year = activeConfig.academic_year
+          console.log('从计算规则获取启用学年:', activeConfig.academic_year)
+        } else {
+          console.warn('未找到启用的计算规则配置，使用默认学年:', this.calcForm.academic_year)
+        }
+      } catch (error) {
+        console.error('获取计算规则配置失败:', error)
+      }
     },
     
     // 刷新数据
@@ -814,16 +840,21 @@ export default {
     
     async getFamilyOptions() {
       try {
-        const res = await this.$http.get('/tuition/calculate/', { params: { type: 'families' }})
+        const params = { type: 'families' }
+        // 如果有当前学年，按学年过滤家庭列表
+        if (this.calcForm.academic_year) {
+          params.academic_year = this.calcForm.academic_year
+        }
+        const res = await this.$http.get('/tuition/calculate/', { params })
         let allFamilies = res.data || []
-        console.log('后端返回的所有家庭:', allFamilies)
+        console.log(`后端返回的 ${this.calcForm.academic_year || '全部'} 学年家庭:`, allFamilies)
         
-        // 直接使用后端返回的家庭列表（已去重）
+        // 直接使用后端返回的家庭列表（已去重并按学年过滤）
         this.familyOptions = allFamilies
         console.log('有效家庭数量:', allFamilies.length)
         
         if (allFamilies.length === 0) {
-          this.$message.warning('没有可计算的家庭，请先在学生学费信息管理中维护家庭数据')
+          this.$message.warning(`学年 ${this.calcForm.academic_year} 没有可计算的家庭，请先在学生学费信息管理中维护家庭数据`)
         }
       } catch (error) {
         console.error('获取家庭列表失败:', error)
@@ -851,9 +882,14 @@ export default {
           if (activeConfig) {
             this.currentSemesterConfig = activeConfig
             this.calcForm.semester_id = activeConfig.id
-            // 自动更新学年为选中学期的学年
-            this.calcForm.academic_year = activeConfig.academic_year
-            console.log('使用当前学期:', activeConfig.name, '学年:', activeConfig.academic_year)
+            // 只有未从计算规则获取学年时，才使用学期配置的学年
+            if (!this.calcForm.academic_year) {
+              this.calcForm.academic_year = activeConfig.academic_year
+              console.log('使用学期配置学年:', activeConfig.academic_year)
+            } else {
+              console.log('保持计算规则学年:', this.calcForm.academic_year, '学期学年:', activeConfig.academic_year)
+            }
+            console.log('使用当前学期:', activeConfig.name)
           }
         }
       } catch (error) {
@@ -865,7 +901,7 @@ export default {
       if (!this.validateCalcForm()) return
       
       try {
-        const params = this.buildCalcParams({ action: 'calculate_all' })
+        const params = this.buildCalcParams({ action: 'calculate_all', save_record: true })
         console.log('计算所有家庭，参数:', params, '显示:', this.getPaymentTypeLabel())
         
         const res = await this.$http.post('/tuition/calculate/', params)
@@ -896,7 +932,8 @@ export default {
         // 使用批量计算接口
         const params = this.buildCalcParams({ 
           action: 'calculate_batch',
-          invoice_nos: this.selectedFamilyList
+          invoice_nos: this.selectedFamilyList,
+          save_record: true
         })
         console.log('批量制作学费单，参数:', params)
         

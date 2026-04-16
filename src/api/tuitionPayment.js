@@ -127,3 +127,16 @@ export function getTuitionPaymentGrades() {
     method: 'get'
   })
 }
+
+/**
+ * 导出学费支付记录
+ * @param {Object} params 查询参数（academic_year）
+ */
+export function exportTuitionPayment(params) {
+  return http({
+    url: '/tuition-payment/export/',
+    method: 'get',
+    params,
+    responseType: 'blob'
+  })
+}

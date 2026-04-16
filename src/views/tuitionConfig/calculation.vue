@@ -51,6 +51,15 @@
 
 
 
+        <el-divider content-position="left">折扣配置</el-divider>
+        <el-row :gutter="20">
+          <el-col :span="8">
+            <el-form-item label="公司人数阈值">
+              <el-input-number v-model="configForm.company_person_num" :min="1" :precision="0" style="width: 100%;" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
         <el-divider content-position="left">校车费用</el-divider>
         <el-row :gutter="20">
           <el-col :span="8">
@@ -109,6 +118,7 @@ export default {
         company_discount_rate: 5,
         alumni_discount_rate: 5,
         teacher_discount_rate: 10,
+        company_person_num: 70,
         bus_annual_payment: 11000,
         bus_semester_1_payment: 5900,
         bus_semester_2_payment: 5100,
@@ -169,6 +179,7 @@ export default {
         company_discount_rate: config.company_discount_rate || 5,
         alumni_discount_rate: config.alumni_discount_rate || 5,
         teacher_discount_rate: config.teacher_discount_rate || 10,
+        company_person_num: config.company_person_num || 70,
         bus_annual_payment: config.bus_annual_payment || 11000,
         bus_semester_1_payment: config.bus_semester_1_payment || 5900,
         bus_semester_2_payment: config.bus_semester_2_payment || 5100,
@@ -201,6 +212,7 @@ export default {
         company_discount_rate: 5,
         alumni_discount_rate: 5,
         teacher_discount_rate: 10,
+        company_person_num: 70,
         bus_annual_payment: 11000,
         bus_semester_1_payment: 5900,
         bus_semester_2_payment: 5100,
@@ -225,6 +237,7 @@ export default {
           company_discount_rate: parseFloat(this.configForm.company_discount_rate) || 0,
           alumni_discount_rate: parseFloat(this.configForm.alumni_discount_rate) || 0,
           teacher_discount_rate: parseFloat(this.configForm.teacher_discount_rate) || 0,
+          company_person_num: parseInt(this.configForm.company_person_num) || 70,
           bus_annual_payment: parseFloat(this.configForm.bus_annual_payment) || 0,
           bus_semester_1_payment: parseFloat(this.configForm.bus_semester_1_payment) || 0,
           bus_semester_2_payment: parseFloat(this.configForm.bus_semester_2_payment) || 0,

@@ -80,17 +80,6 @@ export const constantRoutes = [
   },
 
   {
-    path: '/tuition-payment',
-    component: Layout,
-    children: [{
-      path: 'index',
-      name: 'TuitionPayment',
-      component: () => import('@/views/tuitionPayment/index'),
-      meta: { title: '缴费管理', icon: 'el-icon-money' }
-    }]
-  },
-
-  {
     path: '/statistics',
     component: Layout,
     children: [{
