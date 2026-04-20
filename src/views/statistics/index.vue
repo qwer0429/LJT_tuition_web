@@ -98,6 +98,23 @@
         <el-table-column prop="grade" label="年级" align="center" width="80" />
         <el-table-column prop="invoice_no" label="Invoice No号码" align="center" min-width="140" />
         <el-table-column prop="tuition_period" label="学费期间" align="center" min-width="160" />
+        <el-table-column prop="tuition_days" label="学费期间天数" align="center" width="110" />
+        <el-table-column label="家庭折扣" align="right" width="110">
+          <template slot-scope="scope">
+            <div v-if="scope.row.family_discount > 0" style="color: #E6A23C;">
+              ¥{{ formatMoney(scope.row.family_discount) }}
+            </div>
+            <div v-else>-</div>
+          </template>
+        </el-table-column>
+        <el-table-column label="其他折扣" align="right" width="110">
+          <template slot-scope="scope">
+            <div v-if="scope.row.other_discount > 0" style="color: #E6A23C;">
+              ¥{{ formatMoney(scope.row.other_discount) }}
+            </div>
+            <div v-else>-</div>
+          </template>
+        </el-table-column>
         <el-table-column label="学费" align="right" min-width="120">
           <template slot-scope="scope">
             <div>应付: ¥{{ formatMoney(scope.row.tuition_payable) }}</div>
@@ -190,7 +207,16 @@
         <el-descriptions-item label="年级">{{ currentRow.grade }}</el-descriptions-item>
         <el-descriptions-item label="家庭编号">{{ currentRow.invoice_no }}</el-descriptions-item>
         <el-descriptions-item label="学费期间">{{ currentRow.tuition_period }}</el-descriptions-item>
+        <el-descriptions-item label="学费期间天数">{{ currentRow.tuition_days || '-' }}</el-descriptions-item>
         <el-descriptions-item label="标准学费">¥{{ formatMoney(currentRow.base_tuition) }}</el-descriptions-item>
+        <el-descriptions-item label="家庭折扣">
+          <span v-if="currentRow.family_discount > 0" style="color: #E6A23C;">¥{{ formatMoney(currentRow.family_discount) }}</span>
+          <span v-else>-</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="其他折扣">
+          <span v-if="currentRow.other_discount > 0" style="color: #E6A23C;">¥{{ formatMoney(currentRow.other_discount) }}</span>
+          <span v-else>-</span>
+        </el-descriptions-item>
         <el-descriptions-item label="应付学费">¥{{ formatMoney(currentRow.tuition_payable) }}</el-descriptions-item>
         <el-descriptions-item label="已付学费">¥{{ formatMoney(currentRow.paid_tuition_fee) }}</el-descriptions-item>
         <el-descriptions-item label="校车费">¥{{ formatMoney(currentRow.school_bus_fee) }}</el-descriptions-item>
@@ -262,6 +288,11 @@
         <el-divider content-position="left">学费信息（由学费单生成，只读）</el-divider>
         <el-row :gutter="20">
           <el-col :span="8">
+            <el-form-item label="学费期间天数">
+              <div class="readonly-field">{{ editForm.tuition_days || '-' }} 天</div>
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
             <el-form-item label="标准学费">
               <div class="readonly-field">¥{{ formatMoney(editForm.base_tuition) }}</div>
             </el-form-item>
@@ -271,6 +302,8 @@
               <div class="readonly-field">¥{{ formatMoney(editForm.registration_fee) }}</div>
             </el-form-item>
           </el-col>
+        </el-row>
+        <el-row :gutter="20">
           <el-col :span="8">
             <el-form-item label="家庭折扣">
               <div class="readonly-field">¥{{ formatMoney(editForm.family_discount) }}</div>
@@ -502,6 +535,7 @@ export default {
         family_discount: 0,
         other_discount: 0,
         tuition_payable: 0,
+        tuition_days: 0,
         bus_fee_period: '',
         school_bus_fee: 0,
         dormitory_period: '',
@@ -569,6 +603,14 @@ export default {
           }
         })
         this.academicYearOptions = Array.from(years).sort((a, b) => b.localeCompare(a))
+        
+        // 默认选中当前启用的计算规则学年
+        if (!this.queryParams.academic_year) {
+          const activeConfig = configs.find(c => c.is_active)
+          if (activeConfig && activeConfig.academic_year) {
+            this.queryParams.academic_year = activeConfig.academic_year
+          }
+        }
       } catch (error) {
         console.error('加载学年选项失败:', error)
       }
@@ -715,6 +757,7 @@ export default {
         student_name: row.student_name || '',
         invoice_no: row.invoice_no || '',
         tuition_period: row.tuition_period || '',
+        tuition_days: numeric(row.tuition_days),
         grade: row.grade || '',
         base_tuition: numeric(row.base_tuition),
         registration_fee: numeric(row.registration_fee),
@@ -771,6 +814,7 @@ export default {
           student_name: this.editForm.student_name || null,
           invoice_no: this.editForm.invoice_no || null,
           tuition_period: this.editForm.tuition_period || null,
+          tuition_days: this.editForm.tuition_days || 0,
           grade: this.editForm.grade || null,
           base_tuition: this.editForm.base_tuition || 0,
           registration_fee: this.editForm.registration_fee || 0,

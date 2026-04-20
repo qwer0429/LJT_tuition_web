@@ -874,23 +874,31 @@ export default {
         } else if (res.data) {
           results = Array.isArray(res.data) ? res.data : [res.data]
         }
+        
+        // 过滤：只显示与当前计算规则学年一致的学期
+        if (this.calcForm.academic_year) {
+          results = results.filter(item => item.academic_year === this.calcForm.academic_year)
+          console.log(`学期已按学年过滤: ${this.calcForm.academic_year}, 剩余 ${results.length} 个学期`)
+        }
+        
         this.semesterOptions = results
         
-        // 使用第一个启用的学期作为当前学期
+        // 使用过滤后第一个启用的学期作为当前学期
         if (results.length > 0) {
           const activeConfig = results.find(item => item.is_active)
           if (activeConfig) {
             this.currentSemesterConfig = activeConfig
             this.calcForm.semester_id = activeConfig.id
-            // 只有未从计算规则获取学年时，才使用学期配置的学年
-            if (!this.calcForm.academic_year) {
-              this.calcForm.academic_year = activeConfig.academic_year
-              console.log('使用学期配置学年:', activeConfig.academic_year)
-            } else {
-              console.log('保持计算规则学年:', this.calcForm.academic_year, '学期学年:', activeConfig.academic_year)
-            }
             console.log('使用当前学期:', activeConfig.name)
+          } else {
+            // 没有启用的学期，默认选第一个
+            this.currentSemesterConfig = results[0]
+            this.calcForm.semester_id = results[0].id
           }
+        } else {
+          this.currentSemesterConfig = null
+          this.calcForm.semester_id = null
+          console.warn(`学年 ${this.calcForm.academic_year} 没有可用的学期配置`)
         }
       } catch (error) {
         console.error('获取学期列表失败:', error)
@@ -914,7 +922,8 @@ export default {
           this.$message.info('使用的是非当前学期的配置')
         }
         
-        this.$message.success('计算完成')
+        const msg = res.message || '计算完成'
+        this.$message.success(msg)
       } catch (error) {
         this.$message.error('计算失败')
       }
@@ -973,7 +982,8 @@ export default {
           console.warn('制作失败的家庭:', res.data.errors)
         }
         
-        this.$message.success(`成功制作 ${res.data.family_count} 个家庭的学费单`)
+        const msg = res.message || `成功制作 ${res.data.family_count} 个家庭的学费单`
+        this.$message.success(msg)
       } catch (error) {
         this.$message.error('制作失败: ' + (error.message || '未知错误'))
         console.error('批量制作失败:', error)
@@ -1099,7 +1109,7 @@ export default {
             this.stopEmailStatusPolling()
             this.emailSendingInvoiceNo = null
             // 刷新列表数据
-            this.fetchCalculationResult()
+            this.initPageData()
           } else {
             console.log('[邮件状态] 尚未发送成功，继续轮询...')
           }
@@ -1212,7 +1222,7 @@ export default {
         }
 
         // 刷新列表数据
-        this.fetchCalculationResult()
+        this.initPageData()
       } catch (error) {
         console.error('批量邮件发送失败:', error)
         this.$message.error('批量邮件发送失败：' + (error.message || '网络错误'))
@@ -1272,7 +1282,7 @@ export default {
         this.batchEmailDialogVisible = false
         this.batchEmailAttachmentList = []
         // 刷新列表数据
-        this.fetchCalculationResult()
+        this.initPageData()
       } catch (error) {
         console.error('批量邮件发送失败:', error)
         this.$message.error('批量邮件发送失败：' + (error.message || '网络错误'))

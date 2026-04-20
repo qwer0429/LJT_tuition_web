@@ -28,8 +28,17 @@
       <el-table-column type="expand">
         <template slot-scope="scope">
           <div style="padding: 10px; background: #f5f7fa;">
-            <div style="margin-bottom: 10px; font-weight: bold; color: #606266;">
-              <i class="el-icon-date" /> {{ scope.row.name }} 到校日历
+            <div style="margin-bottom: 10px; font-weight: bold; color: #606266; display: flex; justify-content: space-between; align-items: center;">
+              <span><i class="el-icon-date" /> {{ scope.row.name }} 到校日历</span>
+              <span>
+                <el-button v-if="!multiSelectMode" type="text" icon="el-icon-check" @click="toggleMultiSelect(scope.row)">进入多选</el-button>
+                <template v-else>
+                  <el-tag type="info" size="mini" style="margin-right: 10px;">已选 {{ selectedDayIds.size }} 天</el-tag>
+                  <el-button type="success" size="mini" icon="el-icon-check" @click="batchSetTeachingDay(scope.row)">批量到校</el-button>
+                  <el-button type="warning" size="mini" icon="el-icon-close" @click="batchSetNonTeachingDay(scope.row)">批量休假</el-button>
+                  <el-button type="text" icon="el-icon-close" @click="toggleMultiSelect(scope.row)">退出多选</el-button>
+                </template>
+              </span>
             </div>
             <!-- 日历视图 -->
             <div class="calendar-view">
@@ -39,11 +48,17 @@
                   <span v-for="day in ['日', '一', '二', '三', '四', '五', '六']" :key="day" class="week-day">{{ day }}</span>
                 </div>
                 <div class="days-grid">
-                  <div 
-                    v-for="(day, dayIndex) in month.days" 
+                  <div
+                    v-for="(day, dayIndex) in month.days"
                     :key="dayIndex"
-                    :class="['day-cell', getDayClass(day), { 'clickable': day }]"
-                    @click="day && handleDayClick(scope.row, day)"
+                    :class="[
+                      'day-cell',
+                      getDayClass(day),
+                      { 'clickable': day && !multiSelectMode },
+                      { 'multi-selectable': day && multiSelectMode },
+                      { 'selected': day && multiSelectMode && selectedDayIds[day.id] }
+                    ]"
+                    @click="day && handleDayCellClick(scope.row, day)"
                   >
                     <template v-if="day">
                       <div class="day-number">{{ day.date.getDate() }}</div>
@@ -58,7 +73,6 @@
           </div>
         </template>
       </el-table-column>
-      <el-table-column label="ID" prop="id" align="center" width="60" />
       <el-table-column label="学年" prop="academic_year" align="center" width="120" />
       <el-table-column label="学期" align="center" width="120">
         <template slot-scope="scope">
@@ -213,7 +227,6 @@
       </div>
     </el-dialog>
 
-
   </div>
 </template>
 
@@ -266,7 +279,10 @@ export default {
         end_date: [{ required: true, message: '请选择结束日期', trigger: 'change' }]
       },
       importResult: null,
-      academicYearOptions: []
+      academicYearOptions: [],
+      // 多选模式
+      multiSelectMode: false,
+      selectedDayIds: {}
     }
   },
   created() {
@@ -416,16 +432,16 @@ export default {
       monthsMap.forEach(monthData => {
         const firstDay = monthData.days[0].date
         const firstDayOfWeek = firstDay.getDay() // 0=周日, 1=周一...
-        
+
         // 在前面填充空白天数
         const paddedDays = []
         for (let i = 0; i < firstDayOfWeek; i++) {
           paddedDays.push(null)
         }
-        
+
         // 填充该月的所有天数
         paddedDays.push(...monthData.days)
-        
+
         // 补全到35个格子（5行）或42个格子（6行）
         const totalCells = paddedDays.length <= 35 ? 35 : 42
         while (paddedDays.length < totalCells) {
@@ -474,7 +490,7 @@ export default {
       try {
         const newStatus = !day.is_teaching_day
         const actionText = newStatus ? '设为到校日' : '设为非到校日'
-        
+
         await this.$confirm(`确认将该日期${actionText}？`, '提示', {
           confirmButtonText: '确定',
           cancelButtonText: '取消',
@@ -487,14 +503,15 @@ export default {
         })
 
         // 更新本地数据
+        // eslint-disable-next-line require-atomic-updates
         day.is_teaching_day = newStatus
-        
+
         // 更新原始 calendar_days 数据中的对应项
         const calendarDay = semester.calendar_days.find(d => d.id === day.id)
         if (calendarDay) {
           calendarDay.is_teaching_day = newStatus
         }
-        
+
         // 使用后端返回的 semester_total_teaching_days 更新总到校日
         if (res && res.semester_total_teaching_days !== undefined) {
           this.updateSemesterTeachingDays(semester, res.semester_total_teaching_days)
@@ -512,10 +529,104 @@ export default {
       }
     },
 
+    // 切换多选模式
+    toggleMultiSelect(semester) {
+      this.multiSelectMode = !this.multiSelectMode
+      this.selectedDayIds = {}
+    },
+
+    // 日期格子点击（多选模式）
+    handleDayCellClick(semester, day) {
+      if (this.multiSelectMode) {
+        if (this.selectedDayIds[day.id]) {
+          this.$delete(this.selectedDayIds, day.id)
+        } else {
+          this.$set(this.selectedDayIds, day.id, true)
+        }
+      } else {
+        this.handleDayClick(semester, day)
+      }
+    },
+
+    // 批量设为到校日
+    async batchSetTeachingDay(semester) {
+      const ids = Object.keys(this.selectedDayIds).map(Number)
+      if (ids.length === 0) {
+        this.$message.warning('请先选择日期')
+        return
+      }
+      try {
+        await this.$confirm(`确认将选中的 ${ids.length} 天设为到校日？`, '提示', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        })
+        this.listLoading = true
+        await this.$http.patch('/schoolcalendar/batch-update/', {
+          ids: ids,
+          is_teaching_day: true
+        })
+        // 更新本地数据
+        ids.forEach(id => {
+          const calendarDay = semester.calendar_days.find(d => d.id === id)
+          if (calendarDay && !calendarDay.is_weekend) {
+            calendarDay.is_teaching_day = true
+          }
+        })
+        this.recalculateTeachingDays(semester)
+        this.selectedDayIds = {}
+        this.$message.success('批量更新成功')
+      } catch (error) {
+        if (error !== 'cancel') {
+          console.error('批量更新失败:', error)
+          this.$message.error('批量更新失败')
+        }
+      } finally {
+        this.listLoading = false
+      }
+    },
+
+    // 批量设为非到校日（休假）
+    async batchSetNonTeachingDay(semester) {
+      const ids = Object.keys(this.selectedDayIds).map(Number)
+      if (ids.length === 0) {
+        this.$message.warning('请先选择日期')
+        return
+      }
+      try {
+        await this.$confirm(`确认将选中的 ${ids.length} 天设为非到校日？`, '提示', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        })
+        this.listLoading = true
+        await this.$http.patch('/schoolcalendar/batch-update/', {
+          ids: ids,
+          is_teaching_day: false
+        })
+        // 更新本地数据
+        ids.forEach(id => {
+          const calendarDay = semester.calendar_days.find(d => d.id === id)
+          if (calendarDay) {
+            calendarDay.is_teaching_day = false
+          }
+        })
+        this.recalculateTeachingDays(semester)
+        this.selectedDayIds = {}
+        this.$message.success('批量更新成功')
+      } catch (error) {
+        if (error !== 'cancel') {
+          console.error('批量更新失败:', error)
+          this.$message.error('批量更新失败')
+        }
+      } finally {
+        this.listLoading = false
+      }
+    },
+
     // 使用后端返回的总到校日数更新学期数据
     updateSemesterTeachingDays(semester, totalDays) {
       semester.total_teaching_days = totalDays
-      
       // 强制更新列表中的学期数据
       const index = this.list.findIndex(s => s.id === semester.id)
       if (index !== -1) {
@@ -526,10 +637,10 @@ export default {
     // 重新计算学期的总到校日数（本地计算备用）
     recalculateTeachingDays(semester) {
       if (!semester.calendar_days) return
-      
+
       const teachingDays = semester.calendar_days.filter(day => day.is_teaching_day).length
       semester.total_teaching_days = teachingDays
-      
+
       // 强制更新列表中的学期数据
       const index = this.list.findIndex(s => s.id === semester.id)
       if (index !== -1) {
@@ -832,5 +943,19 @@ export default {
 // 学期开始/结束标记
 .semester-edge {
   box-shadow: 0 0 0 2px #409eff;
+}
+
+// 多选模式样式
+.day-cell.multi-selectable {
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.day-cell.multi-selectable:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.day-cell.selected {
+  box-shadow: 0 0 0 2px #409eff;
+  transform: scale(1.05);
 }
 </style>

@@ -4,6 +4,7 @@
     <el-card class="operate-container search-header" shadow="never">
       <div class="table-operation">
         <el-button type="primary" icon="el-icon-plus" @click="handleAdd">新增年级配置</el-button>
+        <el-button type="warning" icon="el-icon-copy-document" @click="handleCopyDialog">复制学年配置</el-button>
         <el-button icon="el-icon-refresh" @click="getList">刷新</el-button>
       </div>
       <!-- 筛选区域 -->
@@ -41,7 +42,6 @@
       >
         <el-table-column label="学年" prop="academic_year" align="center" min-width="120" />
         <el-table-column label="年级名称" prop="grade_name" align="center" min-width="120" />
-        <el-table-column label="年级代码" prop="grade_code" align="center" min-width="120" />
         <el-table-column label="基础学费(全年)" prop="base_tuition" align="center" min-width="150">
           <template slot-scope="scope">
             <span class="amount-text">¥{{ formatMoney(scope.row.base_tuition) }}</span>
@@ -78,6 +78,24 @@
       </div>
     </el-card>
 
+    <!-- 复制学年配置对话框 -->
+    <el-dialog title="复制学年配置" :visible.sync="copyDialogVisible" width="500px">
+      <el-form ref="copyForm" :model="copyForm" :rules="copyRules" label-width="120px">
+        <el-form-item label="源学年" prop="source_academic_year">
+          <el-select v-model="copyForm.source_academic_year" placeholder="请选择要复制的学年" style="width: 100%;">
+            <el-option v-for="year in academicYearOptions" :key="year" :label="year" :value="year" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="目标学年" prop="target_academic_year">
+          <el-input v-model="copyForm.target_academic_year" placeholder="如：2025-2026" />
+        </el-form-item>
+      </el-form>
+      <div slot="footer" class="dialog-footer">
+        <el-button @click="copyDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleSubmitCopy">确认复制</el-button>
+      </div>
+    </el-dialog>
+
     <!-- 编辑/新增对话框 -->
     <el-dialog :title="dialogTitle" :visible.sync="dialogVisible" width="600px">
       <el-form ref="gradeForm" :model="gradeForm" :rules="rules" label-width="130px">
@@ -85,10 +103,7 @@
           <el-input v-model="gradeForm.academic_year" placeholder="如：2025-2026" />
         </el-form-item>
         <el-form-item label="年级名称" prop="grade_name">
-          <el-input v-model="gradeForm.grade_name" placeholder="如：PYP5" />
-        </el-form-item>
-        <el-form-item label="年级代码" prop="grade_code">
-          <el-input v-model="gradeForm.grade_code" placeholder="如：P5" />
+          <el-input v-model="gradeForm.grade_name" placeholder="如：PYP5 / P5" />
         </el-form-item>
         <el-form-item label="基础学费(全年)" prop="base_tuition">
           <el-input-number v-model="gradeForm.base_tuition" :min="0" :precision="2" style="width: 100%;" />
@@ -132,7 +147,6 @@ export default {
         id: null,
         academic_year: '',
         grade_name: '',
-        grade_code: '',
         base_tuition: 165000,
         semester_base_tuition: 0,
         registration_fee: 2000,
@@ -142,10 +156,19 @@ export default {
       rules: {
         academic_year: [{ required: true, message: '请输入学年', trigger: 'blur' }],
         grade_name: [{ required: true, message: '请输入年级名称', trigger: 'blur' }],
-        grade_code: [{ required: true, message: '请输入年级代码', trigger: 'blur' }],
         base_tuition: [{ required: true, message: '请输入基础学费', trigger: 'blur' }],
         semester_base_tuition: [{ required: true, message: '请输入学期基础学费', trigger: 'blur' }],
         registration_fee: [{ required: true, message: '请输入注册费', trigger: 'blur' }]
+      },
+      // 复制对话框
+      copyDialogVisible: false,
+      copyForm: {
+        source_academic_year: '',
+        target_academic_year: ''
+      },
+      copyRules: {
+        source_academic_year: [{ required: true, message: '请选择源学年', trigger: 'change' }],
+        target_academic_year: [{ required: true, message: '请输入目标学年', trigger: 'blur' }]
       }
     }
   },
@@ -158,7 +181,8 @@ export default {
       return this.list.filter(item => item.academic_year === this.filterAcademicYear)
     }
   },
-  created() {
+  async created() {
+    await this.initDefaultAcademicYear()
     this.getList()
   },
   mounted() {
@@ -168,6 +192,27 @@ export default {
     })
   },
   methods: {
+    // 初始化默认学年（从计算规则配置中获取启用的学年）
+    async initDefaultAcademicYear() {
+      try {
+        const res = await this.$http.get('/tuitioncalculationconfig/')
+        let configs = []
+        if (Array.isArray(res)) {
+          configs = res
+        } else if (res.results && Array.isArray(res.results)) {
+          configs = res.results
+        } else if (res.data && Array.isArray(res.data)) {
+          configs = res.data
+        }
+        const activeConfig = configs.find(c => c.is_active)
+        if (activeConfig && activeConfig.academic_year) {
+          this.filterAcademicYear = activeConfig.academic_year
+          console.log('年级配置页默认学年:', activeConfig.academic_year)
+        }
+      } catch (error) {
+        console.error('获取默认学年失败:', error)
+      }
+    },
     // 计算表格最大高度，避免双滚动条
     getTableHeight() {
       this.$nextTick(() => {
@@ -260,7 +305,6 @@ export default {
         id: null,
         academic_year: '',
         grade_name: '',
-        grade_code: '',
         base_tuition: 165000,
         semester_base_tuition: 0,
         registration_fee: 2000,
@@ -281,7 +325,6 @@ export default {
         id: row.id,
         academic_year: row.academic_year || '',
         grade_name: row.grade_name || '',
-        grade_code: row.grade_code || '',
         base_tuition: parseFloat(row.base_tuition) || 0,
         semester_base_tuition: parseFloat(row.semester_base_tuition) || 0,
         registration_fee: parseFloat(row.registration_fee) || 0,
@@ -324,6 +367,32 @@ export default {
         // 恢复原始状态
         this.$set(row, 'is_active', !newStatus)
       }
+    },
+    // 打开复制对话框
+    handleCopyDialog() {
+      this.copyDialogVisible = true
+      this.copyForm = {
+        source_academic_year: this.filterAcademicYear || '',
+        target_academic_year: ''
+      }
+      this.$nextTick(() => {
+        this.$refs.copyForm && this.$refs.copyForm.clearValidate()
+      })
+    },
+    // 提交复制
+    async handleSubmitCopy() {
+      this.$refs.copyForm.validate(async(valid) => {
+        if (!valid) return
+        try {
+          const res = await this.$http.post('/gradetuitionconfig/copy/', this.copyForm)
+          this.$message.success(res.message || '复制成功')
+          this.copyDialogVisible = false
+          this.getList()
+        } catch (error) {
+          console.error('复制失败:', error)
+          this.$message.error(error.message || '复制失败')
+        }
+      })
     },
     // 提交表单
     async handleSubmit() {

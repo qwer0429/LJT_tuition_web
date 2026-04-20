@@ -674,9 +674,9 @@ export default {
       this.$message.success('数据已刷新')
     },
 
-    // 从列表数据中提取学年列表（去重并排序）
+    // 将列表数据中的学年补充到选项中（计算规则为主要来源）
     extractAcademicYears() {
-      const years = new Set()
+      const years = new Set(this.academicYearOptions)
       this.list.forEach(item => {
         if (item.academic_year) {
           years.add(item.academic_year)
@@ -687,8 +687,8 @@ export default {
         years.add(this.listQuery.academic_year)
       }
       // 转为数组并按降序排序
-      this.academicYearOptions = Array.from(years).sort().reverse()
-      console.log('提取的学年列表:', this.academicYearOptions)
+      this.academicYearOptions = Array.from(years).sort((a, b) => b.localeCompare(a))
+      console.log('合并后的学年列表:', this.academicYearOptions)
     },
 
     // 计算表格最大高度，避免双滚动条
@@ -1740,11 +1740,26 @@ export default {
       }
     },
 
-    handleDownloadTemplate() {
-      // 下载导入模板
-      const templateUrl = '/sljt/tuition/excel/template/'
-      window.open(templateUrl, '_blank')
-      this.$message.success('模板下载中...')
+    async handleDownloadTemplate() {
+      // 使用认证请求下载模板（window.open 不会携带 JWT Token）
+      try {
+        const response = await this.$http.get('/tuition/excel/template/', {
+          responseType: 'blob'
+        })
+        const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = '学费信息导入模板.xlsx'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+        this.$message.success('模板下载成功')
+      } catch (error) {
+        this.$message.error('模板下载失败')
+        console.error('下载模板失败:', error)
+      }
     }
   }
 }
