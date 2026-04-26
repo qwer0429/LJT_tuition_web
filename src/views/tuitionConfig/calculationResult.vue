@@ -8,7 +8,7 @@
       <el-form :inline="true" :model="calcForm" class="demo-form-inline">
         <el-form-item label="计算方式：">
           <el-select v-model="calcForm.payment_type" placeholder="请选择计算方式" style="width: 120px;" @change="handlePaymentTypeChange">
-            <el-option label="全年" value="yearly" />
+            <el-option label="学年" value="yearly" />
             <el-option label="学期" value="semester" />
           </el-select>
         </el-form-item>
@@ -23,7 +23,7 @@
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" icon="el-icon-s-claim" @click="handleCalculateAll">制作所有学费单</el-button>
+          <el-button type="primary" icon="el-icon-s-claim" :loading="calculateLoading" @click="handleCalculateAll">制作所有学费单</el-button>
           <el-button type="success" icon="el-icon-message" @click="handleSendBatchEmail">批量发送邮件</el-button>
           <el-button type="warning" icon="el-icon-download" :loading="downloadAllLoading" @click="handleDownloadAllPdfs">一键下载所有PDF</el-button>
           <el-button type="warning" icon="el-icon-download" :loading="downloadSelectedLoading" :disabled="selectedFamilies.length === 0" @click="handleDownloadSelectedPdfs">下载选中({{ selectedFamilies.length }})</el-button>
@@ -58,7 +58,7 @@
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" icon="el-icon-search" :disabled="selectedFamilyList.length === 0" @click="handleCalculateFamily">制作选中学费单({{ selectedFamilyList.length }})</el-button>
+          <el-button type="primary" icon="el-icon-search" :loading="calculateLoading" :disabled="selectedFamilyList.length === 0" @click="handleCalculateFamily">制作选中学费单({{ selectedFamilyList.length }})</el-button>
           <el-button type="success" icon="el-icon-message" :disabled="selectedFamilyList.length === 0" @click="handleSendBatchEmailFromList">发送选中({{ selectedFamilyList.length }})</el-button>
           <el-button icon="el-icon-refresh" @click="handleReset">重置</el-button>
         </el-form-item>
@@ -74,10 +74,11 @@
 
       <div v-if="calculationResult.families">
         <el-descriptions :column="3" border style="margin-bottom: 20px;">
-          <el-descriptions-item label="学期">{{ calculationResult.semester_config?.name || '当前学期' }}</el-descriptions-item>
+          <el-descriptions-item :label="calcForm.payment_type === 'yearly' ? '学年' : '学期'">{{ calcForm.payment_type === 'yearly' ? (calculationResult.semester_config?.academic_year || calculationResult.semester_config?.name?.split(' ')[0] || '当前学年') : (calculationResult.semester_config?.name || '当前学期') }}</el-descriptions-item>
           <el-descriptions-item label="家庭数量">{{ calculationResult.family_count }}</el-descriptions-item>
           <el-descriptions-item label="学生总数">{{ calculationResult.total_students }}</el-descriptions-item>
           <el-descriptions-item :label="calcForm.payment_type === 'yearly' ? '学年日期' : '学期日期'" :span="2">{{ calculationResult.semester_config?.start_date }} 至 {{ calculationResult.semester_config?.end_date }}</el-descriptions-item>
+          <el-descriptions-item label="总到校日">{{ calculationResult.semester_config?.total_working_days || '-' }} 天</el-descriptions-item>
           <el-descriptions-item label="总金额">
             <span class="amount-text" style="font-size: 16px;">¥{{ calculationResult.total_amount }}</span>
           </el-descriptions-item>
@@ -109,13 +110,20 @@
               <el-table-column label="年级" prop="grade" align="center" />
               <el-table-column label="支付方式" align="center" width="80">
                 <template slot-scope="scope">
-                  <el-tag v-if="scope.row.payment_type === 'yearly'" type="success" size="mini">全年</el-tag>
+                  <el-tag v-if="scope.row.payment_type === 'yearly'" type="success" size="mini">学年</el-tag>
                   <el-tag v-else type="warning" size="mini">学期</el-tag>
                 </template>
               </el-table-column>
               <el-table-column label="基础学费" align="center">
                 <template slot-scope="scope">
                   ¥{{ scope.row.base_tuition }}
+                </template>
+              </el-table-column>
+              <el-table-column label="到校日" align="center" width="100">
+                <template slot-scope="scope">
+                  <span v-if="scope.row.student_working_days">{{ scope.row.student_working_days }} 天</span>
+                  <span v-else-if="scope.row.semester_config?.total_working_days">{{ scope.row.semester_config.total_working_days }} 天</span>
+                  <span v-else>-</span>
                 </template>
               </el-table-column>
               <el-table-column label="学期信息" align="center" width="120">
@@ -192,16 +200,24 @@
           <el-descriptions-item label="应付总额">
             <span class="amount-text" style="font-size: 16px;">¥{{ calculationResult.final_total }}</span>
           </el-descriptions-item>
-          <el-descriptions-item label="学期">{{ calculationResult.semester_config?.name || '当前学期' }}</el-descriptions-item>
+          <el-descriptions-item :label="calcForm.payment_type === 'yearly' ? '学年' : '学期'">{{ calcForm.payment_type === 'yearly' ? (calculationResult.semester_config?.academic_year || calculationResult.semester_config?.name?.split(' ')[0] || '当前学年') : (calculationResult.semester_config?.name || '当前学期') }}</el-descriptions-item>
           <el-descriptions-item :label="calcForm.payment_type === 'yearly' ? '学年日期' : '学期日期'" :span="2">{{ calculationResult.semester_config?.start_date }} 至 {{ calculationResult.semester_config?.end_date }}</el-descriptions-item>
+          <el-descriptions-item label="总到校日">{{ calculationResult.semester_config?.total_working_days || '-' }} 天</el-descriptions-item>
         </el-descriptions>
 
         <el-table :data="calculationResult.students" border style="width: 100%; margin-bottom: 15px;">
           <el-table-column label="学生姓名" prop="student_name" align="center" />
           <el-table-column label="年级" prop="grade" align="center" />
+          <el-table-column label="到校日" align="center" width="100">
+            <template slot-scope="scope">
+              <span v-if="scope.row.student_working_days">{{ scope.row.student_working_days }} 天</span>
+              <span v-else-if="scope.row.semester_config?.total_working_days">{{ scope.row.semester_config.total_working_days }} 天</span>
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
           <el-table-column label="支付方式" align="center">
             <template slot-scope="scope">
-              <el-tag v-if="scope.row.payment_type === 'yearly'" type="success">全年</el-tag>
+              <el-tag v-if="scope.row.payment_type === 'yearly'" type="success">学年</el-tag>
               <el-tag v-else type="warning">学期</el-tag>
             </template>
           </el-table-column>
@@ -654,6 +670,7 @@ export default {
       pdfUrl: '',
       downloadAllLoading: false,
       downloadSelectedLoading: false,
+      calculateLoading: false,
       selectedFamilies: [],  // 选中的家庭列表
       isSelectAll: false,  // 是否全选
       emailDialogVisible: false,
@@ -742,7 +759,7 @@ export default {
         }
         return '学期'
       }
-      return '全年'
+      return '学年'
     },
     
     // 处理计算方式变化
@@ -908,6 +925,7 @@ export default {
     async handleCalculateAll() {
       if (!this.validateCalcForm()) return
       
+      this.calculateLoading = true
       try {
         const params = this.buildCalcParams({ action: 'calculate_all', save_record: true })
         console.log('计算所有家庭，参数:', params, '显示:', this.getPaymentTypeLabel())
@@ -926,6 +944,8 @@ export default {
         this.$message.success(msg)
       } catch (error) {
         this.$message.error('计算失败')
+      } finally {
+        this.calculateLoading = false
       }
     },
     async handleCalculateFamily() {
@@ -1048,7 +1068,8 @@ export default {
         this.startEmailStatusPolling(this.currentEmailFamily.invoice_no)
       } catch (error) {
         console.error('邮件发送失败:', error)
-        this.$message.error('邮件发送失败：' + (error.message || '网络错误'))
+        const errorMsg = (error.response && error.response.data && error.response.data.error) || error.message || '网络错误'
+        this.$message.error('邮件发送失败：' + errorMsg)
       } finally {
         this.emailSending = false
       }
@@ -1225,7 +1246,8 @@ export default {
         this.initPageData()
       } catch (error) {
         console.error('批量邮件发送失败:', error)
-        this.$message.error('批量邮件发送失败：' + (error.message || '网络错误'))
+        const errorMsg = (error.response && error.response.data && error.response.data.error) || error.message || '网络错误'
+        this.$message.error('批量邮件发送失败：' + errorMsg)
       } finally {
         this.selectedBatchEmailSending = false
       }
@@ -1285,7 +1307,8 @@ export default {
         this.initPageData()
       } catch (error) {
         console.error('批量邮件发送失败:', error)
-        this.$message.error('批量邮件发送失败：' + (error.message || '网络错误'))
+        const errorMsg = (error.response && error.response.data && error.response.data.error) || error.message || '网络错误'
+        this.$message.error('批量邮件发送失败：' + errorMsg)
       } finally {
         this.batchEmailSending = false
       }

@@ -5,10 +5,10 @@
       <el-form :inline="true" :model="listQuery" class="demo-form-inline">
         <el-row :gutter="10">
           <el-col :span="6">
-            <el-form-item label="家庭编号：" style="width: 100%;">
+            <el-form-item label="invoice_no 号码：" style="width: 100%;">
               <el-select
                 v-model="listQuery.invoice_no"
-                placeholder="请选择或输入家庭编号"
+                placeholder="请选择或输入invoice_no 号码"
                 clearable
                 filterable
                 remote
@@ -71,6 +71,7 @@
       <div class="table-operation">
         <el-button type="primary" icon="el-icon-plus" @click="handleAdd">新增学费信息</el-button>
         <el-button type="success" icon="el-icon-upload2" @click="handleImport">批量导入</el-button>
+        <el-button type="warning" icon="el-icon-download" @click="handleExport">导出</el-button>
         <el-button icon="el-icon-refresh" @click="refreshCache">刷新</el-button>
       </div>
     </el-card>
@@ -97,7 +98,7 @@
           </template>
         </el-table-column>
         <el-table-column label="年级" prop="grade" align="center" min-width="100" />
-        <el-table-column label="家庭编号" prop="family_number" align="center" min-width="120" />
+        <el-table-column label="invoice_no 号码" prop="family_number" align="center" min-width="120" />
         <el-table-column label="学年" prop="academic_year" align="center" width="100" />
         <el-table-column label="出生日期" align="center" width="110">
           <template slot-scope="scope">
@@ -245,8 +246,8 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="家庭编号" prop="invoice_no">
-              <el-input v-model="tuitionForm.invoice_no" placeholder="请输入家庭编号" />
+            <el-form-item label="invoice_no 号码" prop="invoice_no">
+              <el-input v-model="tuitionForm.invoice_no" placeholder="请输入invoice_no 号码" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -392,10 +393,30 @@
       </div>
     </el-dialog>
 
+    <!-- 导出对话框 -->
+    <el-dialog title="导出学生学费信息" :visible.sync="exportDialogVisible" width="450px">
+      <el-form ref="exportForm" :model="exportForm" label-width="120px">
+        <el-form-item label="学年">
+          <el-select v-model="exportForm.academic_year" placeholder="请选择或输入学年" style="width: 100%;" filterable allow-create default-first-option clearable>
+            <el-option v-for="year in academicYearOptions" :key="year" :label="year" :value="year" />
+          </el-select>
+          <div style="color: #909399; font-size: 12px; margin-top: 5px;">留空则导出所有学年</div>
+        </el-form-item>
+        <el-form-item label="年级是否升级">
+          <el-switch v-model="exportForm.upgrade_grade" active-text="是" inactive-text="否" />
+          <div style="color: #909399; font-size: 12px; margin-top: 5px;">开启后 P1→P2, M1→M2, DP1→DP2, DP2不升级</div>
+        </el-form-item>
+      </el-form>
+      <div slot="footer" class="dialog-footer">
+        <el-button @click="exportDialogVisible = false">取消</el-button>
+        <el-button type="primary" icon="el-icon-download" @click="submitExport">导出</el-button>
+      </div>
+    </el-dialog>
+
     <!-- 发送邮件对话框 -->
     <el-dialog :title="isResend ? '重新发送学费邮件' : '发送学费邮件'" :visible.sync="emailDialogVisible" width="600px">
       <el-form label-width="100px" v-if="currentEmailRow">
-        <el-form-item label="家庭编号">
+        <el-form-item label="invoice_no 号码">
           <span>{{ currentEmailRow.family_number || currentEmailRow.invoice_no }}</span>
         </el-form-item>
         <el-form-item label="学生">
@@ -436,7 +457,7 @@
         <!-- 学生基本信息 -->
         <el-descriptions :column="2" border title="学生信息">
           <el-descriptions-item label="学生">{{ detailData.student_name }}</el-descriptions-item>
-          <el-descriptions-item label="家庭编号">{{ detailData.family_number || detailData.invoice_no }}</el-descriptions-item>
+          <el-descriptions-item label="invoice_no 号码">{{ detailData.family_number || detailData.invoice_no }}</el-descriptions-item>
           <el-descriptions-item label="年级">{{ detailData.grade }}</el-descriptions-item>
           <el-descriptions-item label="学年">{{ detailData.academic_year }}</el-descriptions-item>
         </el-descriptions>
@@ -555,6 +576,11 @@ export default {
       importForm: {
         academic_year: ''
       },
+      exportDialogVisible: false,
+      exportForm: {
+        upgrade_grade: false,
+        academic_year: ''
+      },
       tuitionForm: {
         id: null,
         student: null,
@@ -580,7 +606,7 @@ export default {
       emailSending: false,
       rules: {
         student_no_xf: [{ required: true, message: '请输入学号', trigger: 'blur' }],
-        invoice_no: [{ required: true, message: '请输入家庭编号', trigger: 'blur' }]
+        invoice_no: [{ required: true, message: '请输入invoice_no 号码', trigger: 'blur' }]
       }
     }
   },
@@ -975,7 +1001,11 @@ export default {
     // 获取家庭编号选项
     async getFamilyOptions() {
       try {
-        const res = await this.$http.get('/tuition/calculate/', { params: { type: 'families' }})
+        const params = { type: 'families' }
+        if (this.listQuery.academic_year) {
+          params.academic_year = this.listQuery.academic_year
+        }
+        const res = await this.$http.get('/tuition/calculate/', { params })
         console.log('家庭编号接口返回:', res)
         let dataList = []
         if (Array.isArray(res)) {
@@ -1021,6 +1051,7 @@ export default {
     handleSearch() {
       this.listQuery.page = 1
       this.getList()
+      this.getFamilyOptions()
     },
 
     handleReset() {
@@ -1601,7 +1632,34 @@ export default {
     },
 
     handleExport() {
-      this.$message.info('导出功能开发中...')
+      this.exportForm.academic_year = this.listQuery.academic_year || ''
+      this.exportDialogVisible = true
+    },
+    async submitExport() {
+      try {
+        this.$message.info('正在导出，请稍候...')
+        const params = {
+          upgrade_grade: this.exportForm.upgrade_grade,
+          academic_year: this.exportForm.academic_year
+        }
+        const res = await this.$http.get('/studenttuitioninfo/export/', {
+          params,
+          responseType: 'blob'
+        })
+        const blob = new Blob([res.data || res], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+        const link = document.createElement('a')
+        link.href = URL.createObjectURL(blob)
+        const filename = `学生学费信息_${this.exportForm.academic_year || '全部'}_${new Date().toISOString().slice(0, 10)}.xlsx`
+        link.download = filename
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        this.exportDialogVisible = false
+        this.$message.success('导出成功')
+      } catch (error) {
+        console.error('导出失败:', error)
+        this.$message.error('导出失败：' + (error.message || '网络错误'))
+      }
     },
 
     handleImport() {

@@ -11,7 +11,7 @@
             <el-option
               v-for="item in configList"
               :key="item.id"
-              :label="item.name + ' (' + item.academic_year + ')' + (item.is_active ? ' - 启用' : ' - 禁用')"
+              :label="(item.academic_year || '未命名') + (item.is_active ? ' - 启用' : ' - 禁用')"
               :value="item.id"
             />
           </el-select>
@@ -32,17 +32,12 @@
       <el-form ref="configForm" :model="configForm" label-width="180px">
         <el-divider content-position="left">基本信息</el-divider>
         <el-row :gutter="20">
-          <el-col :span="8">
-            <el-form-item label="配置名称" prop="name">
-              <el-input v-model="configForm.name" placeholder="请输入配置名称" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
+          <el-col :span="12">
             <el-form-item label="学年" prop="academic_year">
               <el-input v-model="configForm.academic_year" placeholder="如：2025-2026" />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="12">
             <el-form-item label="启用状态">
               <el-switch v-model="configForm.is_active" active-text="启用" inactive-text="禁用" />
             </el-form-item>
@@ -53,6 +48,33 @@
 
         <el-divider content-position="left">折扣配置</el-divider>
         <el-row :gutter="20">
+          <el-col :span="8">
+            <el-form-item label="第二个孩子折扣(%)">
+              <el-input-number v-model="configForm.sibling_discount_2nd" :min="0" :max="100" :precision="2" style="width: 100%;" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="第三个及以后折扣(%)">
+              <el-input-number v-model="configForm.sibling_discount_3rd" :min="0" :max="100" :precision="2" style="width: 100%;" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="公司折扣(%)">
+              <el-input-number v-model="configForm.company_discount_rate" :min="0" :max="100" :precision="2" style="width: 100%;" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="8">
+            <el-form-item label="校友兄弟姐妹折扣(%)">
+              <el-input-number v-model="configForm.alumni_discount_rate" :min="0" :max="100" :precision="2" style="width: 100%;" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="教师子弟折扣(%)">
+              <el-input-number v-model="configForm.teacher_discount_rate" :min="0" :max="100" :precision="2" style="width: 100%;" />
+            </el-form-item>
+          </el-col>
           <el-col :span="8">
             <el-form-item label="公司人数阈值">
               <el-input-number v-model="configForm.company_person_num" :min="1" :precision="0" style="width: 100%;" />
@@ -110,7 +132,6 @@ export default {
       configList: [],
       selectedConfigId: null,
       configForm: {
-        name: '默认配置',
         academic_year: '2025-2026',
         is_active: true,
         sibling_discount_2nd: 5,
@@ -171,7 +192,7 @@ export default {
       
       this.configId = config.id
       this.configForm = {
-        name: config.name || '默认配置',
+        name: config.academic_year || '默认配置',
         academic_year: config.academic_year || '2025-2026',
         is_active: config.is_active !== false,
         sibling_discount_2nd: config.sibling_discount_2nd || 5,
@@ -195,7 +216,7 @@ export default {
       const config = this.configList.find(c => c.id === configId)
       if (config) {
         this.loadConfig(config)
-        this.$message.success(`已切换到: ${config.name}`)
+        this.$message.success(`已切换到: ${config.academic_year}`)
       }
     },
     
@@ -204,7 +225,7 @@ export default {
       this.configId = null
       this.selectedConfigId = null
       this.configForm = {
-        name: '新配置 ' + new Date().toLocaleDateString(),
+        name: '',
         academic_year: '2025-2026',
         is_active: true,
         sibling_discount_2nd: 5,
@@ -229,7 +250,7 @@ export default {
       try {
         // 确保数值类型正确
         const submitData = {
-          name: this.configForm.name,
+          name: this.configForm.academic_year,
           academic_year: this.configForm.academic_year,
           is_active: this.configForm.is_active,
           sibling_discount_2nd: parseFloat(this.configForm.sibling_discount_2nd) || 0,

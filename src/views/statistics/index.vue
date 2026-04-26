@@ -87,7 +87,7 @@
         fit
         highlight-current-row
         style="width: 100%;"
-        :max-height="tableHeight"
+        height="100%"
       >
         <el-table-column label="学生" align="center" min-width="180">
           <template slot-scope="scope">
@@ -172,20 +172,21 @@
         </el-table-column>
       </el-table>
 
-      <!-- 分页 -->
-      <div style="margin-top: 20px; text-align: right;">
-        <el-pagination
-          background
-          layout="total, sizes, prev, pager, next"
-          :total="total"
-          :page-sizes="[10, 20, 50, 100]"
-          :page-size="queryParams.page_size"
-          :current-page="queryParams.page"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
-        />
-      </div>
     </el-card>
+
+    <!-- 分页 -->
+    <div class="pagination-container">
+      <el-pagination
+        background
+        layout="total, sizes, prev, pager, next"
+        :total="total"
+        :page-sizes="[50, 100, 500, 1000, 2000]"
+        :page-size="queryParams.page_size"
+        :current-page="queryParams.page"
+        @size-change="handleSizeChange"
+        @current-change="handleCurrentChange"
+      />
+    </div>
 
     <!-- 详情对话框 -->
     <el-dialog title="缴费详情" :visible.sync="detailDialogVisible" width="700px">
@@ -501,7 +502,7 @@ export default {
       loading: false,
       queryParams: {
         page: 1,
-        page_size: 20,
+        page_size: 50,
         academic_year: '',
         grade: '',
         payment_status: '',
@@ -574,7 +575,12 @@ export default {
     // 计算表格高度
     calculateTableHeight() {
       const windowHeight = window.innerHeight
-      this.tableHeight = windowHeight - 320
+      // 减去顶部导航(50)、app-container padding(40)、筛选栏、操作栏、间距、分页(52)、card body padding(40)
+      const filterCard = document.querySelector('.filter-container')
+      const operateCard = document.querySelector('.operate-container')
+      const filterHeight = filterCard ? filterCard.offsetHeight : 140
+      const operateHeight = operateCard ? operateCard.offsetHeight : 60
+      this.tableHeight = windowHeight - 50 - 40 - filterHeight - operateHeight - 30 - 52 - 40
     },
 
     // 初始化数据
@@ -921,6 +927,13 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+.app-container {
+  height: calc(100vh - 84px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
 .filter-container {
   .el-form-item {
     margin-bottom: 10px;
@@ -935,9 +948,28 @@ export default {
 }
 
 .table-container {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0 !important;
+  ::v-deep .el-card__body {
+    height: 100%;
+    padding: 10px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+  }
   .el-table {
     font-size: 13px;
   }
+}
+
+.pagination-container {
+  padding: 10px 0;
+  text-align: right;
+  background: #fff;
+  border-top: 1px solid #ebeef5;
 }
 
 .readonly-field {

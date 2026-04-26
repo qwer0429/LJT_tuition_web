@@ -323,11 +323,6 @@ export default {
 
         this.list = dataList
         this.total = dataList.length
-
-        // 默认展开启用的学期
-        this.$nextTick(() => {
-          this.expandActiveSemester()
-        })
       } catch (error) {
         console.error('获取学期列表失败:', error)
         this.$message.error('获取学期列表失败')
@@ -340,23 +335,6 @@ export default {
     async handleExpandChange(row, expandedRows) {
       if (expandedRows.includes(row) && (!row.calendar_days || row.calendar_days.length === 0)) {
         await this.loadCalendarDays(row)
-      }
-    },
-
-    // 默认展开启用的学期
-    async expandActiveSemester() {
-      // 找到启用的学期
-      const activeSemester = this.list.find(s => s.is_active)
-      if (activeSemester) {
-        // 加载每日校历
-        await this.loadCalendarDays(activeSemester)
-        // 触发展开（通过设置表格的展开行）
-        this.$nextTick(() => {
-          const table = this.$refs.calendarTable
-          if (table) {
-            table.toggleRowExpansion(activeSemester, true)
-          }
-        })
       }
     },
 
