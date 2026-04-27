@@ -147,20 +147,6 @@
           <template slot-scope="scope">
             <el-button type="text" size="small" @click="handleEdit(scope.row)">编辑</el-button>
             <el-button type="text" size="small" @click="handleViewDetail(scope.row)">查看详情</el-button>
-            <el-button 
-              v-if="!scope.row.email_sent" 
-              type="text" 
-              size="small" 
-              style="color: #409eff;" 
-              @click="handleSendEmail(scope.row)"
-            >发送邮件</el-button>
-            <el-button 
-              v-else
-              type="text" 
-              size="small" 
-              style="color: #67c23a;" 
-              @click="handleResendEmail(scope.row)"
-            >重新发送</el-button>
             <el-button type="text" size="small" style="color: #f56c6c;" @click="handleDelete(scope.row)">删除</el-button>
           </template>
         </el-table-column>

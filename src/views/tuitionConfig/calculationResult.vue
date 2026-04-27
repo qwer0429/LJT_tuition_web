@@ -6,6 +6,9 @@
         <span>学费单制作</span>
       </div>
       <el-form :inline="true" :model="calcForm" class="demo-form-inline">
+        <el-form-item label="邮件主题：">
+          <el-input v-model="emailSubject" placeholder="请输入邮件主题" style="width: 280px;" />
+        </el-form-item>
         <el-form-item label="计算方式：">
           <el-select v-model="calcForm.payment_type" placeholder="请选择计算方式" style="width: 120px;" @change="handlePaymentTypeChange">
             <el-option label="学年" value="yearly" />
@@ -22,9 +25,11 @@
             />
           </el-select>
         </el-form-item>
+      </el-form>
+      <el-form :inline="true" class="demo-form-inline" style="margin-top: 10px;">
         <el-form-item>
           <el-button type="primary" icon="el-icon-s-claim" :loading="calculateLoading" @click="handleCalculateAll">制作所有学费单</el-button>
-          <el-button type="success" icon="el-icon-message" @click="handleSendBatchEmail">批量发送邮件</el-button>
+          <el-button type="success" icon="el-icon-message" :disabled="!calculationResult || !calculationResult.families || calculationResult.families.length === 0" @click="handleSendBatchEmail">批量发送邮件</el-button>
           <el-button type="warning" icon="el-icon-download" :loading="downloadAllLoading" @click="handleDownloadAllPdfs">一键下载所有PDF</el-button>
           <el-button type="warning" icon="el-icon-download" :loading="downloadSelectedLoading" :disabled="selectedFamilies.length === 0" @click="handleDownloadSelectedPdfs">下载选中({{ selectedFamilies.length }})</el-button>
           <el-button type="info" icon="el-icon-document" @click="handleManualPdfDialog">手动生成PDF</el-button>
@@ -264,6 +269,14 @@
       </div>
     </el-card>
 
+    <!-- 制作结果（空状态） -->
+    <el-card v-else class="result-container" shadow="never" style="margin-top: 15px;">
+      <div style="text-align: center; padding: 40px 0; color: #909399;">
+        <i class="el-icon-s-claim" style="font-size: 48px; margin-bottom: 15px; display: block;"></i>
+        <p style="font-size: 14px;">请先选择计算方式并点击"制作所有学费单"按钮</p>
+      </div>
+    </el-card>
+
     <!-- PDF预览对话框 -->
     <el-dialog title="学费通知单预览" :visible.sync="pdfDialogVisible" width="800px" @close="handlePdfDialogClose">
       <div v-if="pdfUrl" style="text-align: center;">
@@ -445,6 +458,22 @@
           <el-card shadow="never" style="margin-bottom: 15px;">
             <div slot="header" class="clearfix">
               <span>学生 {{ index + 1 }}</span>
+              <el-select
+                v-model="student._selectedTuitionId"
+                filterable
+                clearable
+                placeholder="从学费信息中选择学生"
+                size="mini"
+                style="width: 220px; margin-left: 10px;"
+                @change="val => fillStudentFromTuitionInfo(index, val)"
+              >
+                <el-option
+                  v-for="opt in studentTuitionOptions"
+                  :key="opt.id"
+                  :label="`${opt.student_name || opt.student_no_xf} (${opt.grade || '无年级'})`"
+                  :value="opt.id"
+                />
+              </el-select>
               <el-button v-if="manualPdfForm.students.length > 1" style="float: right; padding: 3px 0; color: #f56c6c;" type="text" @click="removeStudent(index)">删除</el-button>
             </div>
             <el-row :gutter="20">
@@ -515,6 +544,9 @@
               <el-col :span="12">
                 <el-form-item label="家庭折扣率(%)" label-width="120px">
                   <el-input-number v-model="student.sibling_discount_rate" :min="0" :max="100" :precision="2" style="width: 100%;" @change="calculateStudentDiscounts(index)" />
+                  <el-tooltip content="输入值为百分比，如5表示5%，实际计算时自动转换为0.05" placement="top">
+                    <i class="el-icon-question" style="color: #909399; margin-left: 8px; cursor: pointer;" />
+                  </el-tooltip>
                 </el-form-item>
               </el-col>
               <el-col :span="12">
@@ -527,6 +559,9 @@
               <el-col :span="12">
                 <el-form-item label="校友折扣率(%)">
                   <el-input-number v-model="student.alumni_discount_rate" :min="0" :max="100" :precision="2" style="width: 100%;" @change="calculateStudentDiscounts(index)" />
+                  <el-tooltip content="输入值为百分比，如5表示5%，实际计算时自动转换为0.05" placement="top">
+                    <i class="el-icon-question" style="color: #909399; margin-left: 8px; cursor: pointer;" />
+                  </el-tooltip>
                 </el-form-item>
               </el-col>
               <el-col :span="12">
@@ -539,6 +574,9 @@
               <el-col :span="12">
                 <el-form-item label="公司折扣率(%)">
                   <el-input-number v-model="student.company_discount_rate" :min="0" :max="100" :precision="2" style="width: 100%;" @change="calculateStudentDiscounts(index)" />
+                  <el-tooltip content="输入值为百分比，如5表示5%，实际计算时自动转换为0.05" placement="top">
+                    <i class="el-icon-question" style="color: #909399; margin-left: 8px; cursor: pointer;" />
+                  </el-tooltip>
                 </el-form-item>
               </el-col>
               <el-col :span="12">
@@ -556,6 +594,9 @@
               <el-col :span="12">
                 <el-form-item label="教师折扣率(%)">
                   <el-input-number v-model="student.teacher_discount_rate" :min="0" :max="100" :precision="2" style="width: 100%;" :disabled="!student.is_teacher_child" @change="calculateStudentDiscounts(index)" />
+                  <el-tooltip content="输入值为百分比，如5表示5%，实际计算时自动转换为0.05" placement="top">
+                    <i class="el-icon-question" style="color: #909399; margin-left: 8px; cursor: pointer;" />
+                  </el-tooltip>
                 </el-form-item>
               </el-col>
             </el-row>
@@ -601,6 +642,9 @@
               <el-col :span="12">
                 <el-form-item label="奖学金折扣率(%)">
                   <el-input-number v-model="student.scholarship_discount_rate" :min="0" :max="100" :precision="2" style="width: 100%;" @change="calculateStudentDiscounts(index)" />
+                  <el-tooltip content="输入值为百分比，如5表示5%，实际计算时自动转换为0.05" placement="top">
+                    <i class="el-icon-question" style="color: #909399; margin-left: 8px; cursor: pointer;" />
+                  </el-tooltip>
                 </el-form-item>
               </el-col>
               <el-col :span="12">
@@ -640,6 +684,9 @@
               <el-col :span="12">
                 <el-form-item label="助学金折扣率(%)" label-width="130px">
                   <el-input-number v-model="student.financial_aid_discount_rate" :min="0" :max="100" :precision="2" style="width: 100%;" @change="calculateStudentDiscounts(index)" />
+                  <el-tooltip content="输入值为百分比，如5表示5%，实际计算时自动转换为0.05" placement="top">
+                    <i class="el-icon-question" style="color: #909399; margin-left: 8px; cursor: pointer;" />
+                  </el-tooltip>
                 </el-form-item>
               </el-col>
               <el-col :span="12">
@@ -698,6 +745,7 @@ export default {
         semester_id: null,  // null 表示使用当前学期（启用的配置）
         payment_type: 'yearly'  // 'yearly', 'semester'
       },
+      emailSubject: '',  // 邮件主题，由 getActiveCalculationConfig 动态初始化
       selectedFamilyList: [],  // 多选家庭列表
       familyOptions: [],
       semesterOptions: [],
@@ -725,6 +773,7 @@ export default {
       emailSendingInvoiceNo: null,  // 当前正在查询发送状态的invoice_no
       manualPdfDialogVisible: false,
       manualPdfLoading: false,
+      studentTuitionOptions: [],  // 学费信息中的学生列表（用于手动PDF选择）
       manualPdfForm: {
         invoice_no: '',
         family_name: '',
@@ -737,6 +786,7 @@ export default {
         calculation_type: 'yearly', // 'yearly' | 'semester_1' | 'semester_2'
 
         students: [{
+          _selectedTuitionId: null,
           english_name: '',
           student_no: '',
           grade: '',
@@ -876,8 +926,10 @@ export default {
         const activeConfig = configs.find(c => c.is_active)
         if (activeConfig && activeConfig.academic_year) {
           this.calcForm.academic_year = activeConfig.academic_year
+          this.emailSubject = activeConfig.academic_year + ' tuition sheet'
           console.log('从计算规则获取启用学年:', activeConfig.academic_year)
         } else {
+          this.emailSubject = this.calcForm.academic_year + ' tuition sheet'
           console.warn('未找到启用的计算规则配置，使用默认学年:', this.calcForm.academic_year)
         }
       } catch (error) {
@@ -1093,6 +1145,7 @@ export default {
         formData.append('action', 'send_single')
         formData.append('invoice_no', this.currentEmailFamily.invoice_no)
         formData.append('payment_type', this.getActualPaymentType())
+        formData.append('subject', this.emailSubject)
 
         // 添加附件
         this.emailAttachmentList.forEach(file => {
@@ -1243,6 +1296,7 @@ export default {
         const formData = new FormData()
         formData.append('action', 'send_batch')
         formData.append('payment_type', this.getActualPaymentType())
+        formData.append('subject', this.emailSubject)
         // 使用 JSON 字符串发送数组，后端更可靠地解析
         formData.append('invoice_nos', JSON.stringify(invoiceNos))
 
@@ -1317,6 +1371,7 @@ export default {
         const formData = new FormData()
         formData.append('action', 'send_batch')
         formData.append('payment_type', this.getActualPaymentType())
+        formData.append('subject', this.emailSubject)
 
         // 添加附件
         this.batchEmailAttachmentList.forEach(file => {
@@ -1387,8 +1442,10 @@ export default {
     },
 
     // 打开手动生成PDF对话框
-    handleManualPdfDialog() {
+    async handleManualPdfDialog() {
       this.manualPdfDialogVisible = true
+      // 加载学生列表（用于选择）
+      await this.loadStudentTuitionOptions()
       // 重置表单
       this.manualPdfForm = {
         invoice_no: '',
@@ -1402,6 +1459,7 @@ export default {
         calculation_type: 'yearly',
 
         students: [{
+          _selectedTuitionId: null,
           english_name: '',
           student_no: '',
           grade: '',
@@ -1458,6 +1516,7 @@ export default {
       }
       
       this.manualPdfForm.students.push({
+        _selectedTuitionId: null,
         english_name: '',
         student_no: '',
         grade: '',
@@ -1816,6 +1875,91 @@ export default {
       }
     },
 
+    // 加载学费信息中的学生列表（用于手动PDF选择）
+    async loadStudentTuitionOptions() {
+      try {
+        const res = await this.$http.get('/studenttuitioninfo/', {
+          params: {
+            academic_year: this.manualPdfForm.academic_year || '2026-2027',
+            lightweight: 1
+          }
+        })
+        let list = []
+        if (Array.isArray(res)) {
+          list = res
+        } else if (res.results) {
+          list = res.results
+        } else if (res.data && Array.isArray(res.data)) {
+          list = res.data
+        }
+        // 按学生去重（同一个学生可能有多条记录）
+        const seen = new Set()
+        this.studentTuitionOptions = list.filter(item => {
+          const key = item.student_no_xf || item.student_name
+          if (!key || seen.has(key)) return false
+          seen.add(key)
+          return true
+        })
+      } catch (err) {
+        console.error('加载学生列表失败:', err)
+        this.studentTuitionOptions = []
+      }
+    },
+
+    // 从学费信息中选择学生，自动填充表单
+    async fillStudentFromTuitionInfo(index, selectedId) {
+      if (!selectedId) return
+      const selected = this.studentTuitionOptions.find(s => s.id === selectedId)
+      if (!selected) return
+
+      const student = this.manualPdfForm.students[index]
+
+      // 基础信息
+      student.english_name = selected.student_name || ''
+      student.student_no = selected.student_no_xf || ''
+      student.grade = selected.grade || ''
+      student.registration_fee = parseFloat(selected.registration_fee) || 2000
+      student.is_teacher_child = !!selected.is_teacher_child
+      student.needs_school_bus = selected.needs_school_bus !== false
+
+      // 折扣率
+      student.sibling_discount_rate = parseFloat(selected.discount_sibling) || 0
+      student.company_discount_rate = parseFloat(selected.discount_company) || 0
+      student.alumni_discount_rate = parseFloat(selected.discount_alumni) || 0
+      student.teacher_discount_rate = student.is_teacher_child ? 10 : 0
+
+      // 奖学金
+      student.scholarship_amount = parseFloat(selected.scholarship_amount) || 0
+      student.scholarship_discount_rate = parseFloat(selected.scholarship_discount_rate) || 0
+      if (student.scholarship_amount > 0) {
+        student.scholarship_type = 'fixed'
+      } else if (student.scholarship_discount_rate > 0) {
+        student.scholarship_type = 'percentage'
+      } else {
+        student.scholarship_type = 'none'
+      }
+
+      // 助学金
+      student.financial_aid = parseFloat(selected.financial_aid) || 0
+      student.financial_aid_discount_rate = parseFloat(selected.financial_aid_discount_rate) || 0
+      if (student.financial_aid > 0) {
+        student.financial_aid_type = 'fixed'
+        student.financial_aid_amount = student.financial_aid
+      } else if (student.financial_aid_discount_rate > 0) {
+        student.financial_aid_type = 'percentage'
+      } else {
+        student.financial_aid_type = 'none'
+      }
+
+      // 先匹配年级学费配置（获取 base_tuition）
+      await this.handleGradeBlur(index, student)
+
+      // 再计算折扣金额
+      this.calculateStudentDiscounts(index)
+
+      this.$message.success(`已填充学生「${selected.student_name}」的信息`)
+    },
+
     // 格式化金额
     formatMoney(amount) {
       if (!amount) return '0.00'
@@ -1888,33 +2032,34 @@ export default {
       })
     },
 
-    // 一键下载所有PDF
+    // 一键下载所有PDF（直接从学费统计的 tuition_pdf 字段获取）
     async handleDownloadAllPdfs() {
       try {
         await this.$confirm(
-          '即将分批下载所有家庭的学费PDF文件，每批50个家庭，打包成zip格式。请耐心等待。', 
-          '确认下载', 
+          '即将下载所有已保存的学费单PDF文件，打包成zip格式。请耐心等待。',
+          '确认下载',
           { confirmButtonText: '确认下载', cancelButtonText: '取消', type: 'info' }
         )
 
+        this.downloadAllLoading = true
         this.$message.info('开始批量下载PDF文件...')
-        
-        await this.batchDownloadPdfs(
-          {},
-          {
-            loadingKey: 'downloadAllLoading',
-            defaultFilename: 'Tuition_Batch',
-            onComplete: (totalGenerated, totalFailed) => {
-              let msg = `全部下载完成！总共生成 ${totalGenerated} 个PDF文件`
-              if (totalFailed > 0) msg += `，${totalFailed} 个失败`
-              this.$message.success(msg)
-            }
-          }
-        )
+
+        const academicYear = this.calcForm.academic_year
+        const response = await this.$http.get('/tuition-payment/download_pdfs/', {
+          params: { academic_year: academicYear },
+          responseType: 'blob'
+        })
+
+        const filename = `Tuition_PDFs_${academicYear}_${new Date().toISOString().slice(0,19).replace(/[-:T]/g,'')}.zip`
+        this.downloadBlob(new Blob([response.data], { type: 'application/zip' }), filename)
+
+        this.$message.success('PDF批量下载完成')
       } catch (error) {
         if (error === 'cancel') return
         console.error('下载失败:', error)
         this.$message.error('下载失败：' + (error.message || '网络错误'))
+      } finally {
+        this.downloadAllLoading = false
       }
     },
 
@@ -2199,5 +2344,10 @@ export default {
 .student-section .el-card__header {
   background: #f5f7fa;
   padding: 10px 15px;
+}
+
+/* 避免页面底部出现大量空白 */
+.app-container {
+  min-height: auto;
 }
 </style>
