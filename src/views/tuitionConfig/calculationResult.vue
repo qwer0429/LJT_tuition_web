@@ -32,7 +32,7 @@
           <el-button type="success" icon="el-icon-message" :disabled="!calculationResult || !calculationResult.families || calculationResult.families.length === 0" @click="handleSendBatchEmail">批量发送邮件</el-button>
           <el-button type="warning" icon="el-icon-download" :loading="downloadAllLoading" @click="handleDownloadAllPdfs">一键下载所有PDF</el-button>
           <el-button type="warning" icon="el-icon-download" :loading="downloadSelectedLoading" :disabled="selectedFamilies.length === 0" @click="handleDownloadSelectedPdfs">下载选中({{ selectedFamilies.length }})</el-button>
-          <el-button type="info" icon="el-icon-document" @click="handleManualPdfDialog">手动生成PDF</el-button>
+          <el-button type="info" icon="el-icon-document" @click="handleManualPdfDialog">手动制作学费单</el-button>
           <el-button icon="el-icon-refresh" @click="refreshCache">刷新</el-button>
         </el-form-item>
       </el-form>
@@ -391,8 +391,8 @@
       </div>
     </el-dialog>
 
-    <!-- 手动生成PDF对话框 -->
-    <el-dialog title="手动生成学费PDF" :visible.sync="manualPdfDialogVisible" width="950px" :close-on-click-modal="false">
+    <!-- 手动制作学费单对话框 -->
+    <el-dialog title="手动制作学费单" :visible.sync="manualPdfDialogVisible" width="950px" :close-on-click-modal="false">
       <el-form ref="manualPdfForm" :model="manualPdfForm" :rules="manualPdfRules" label-width="140px">
         <el-divider content-position="left">基本信息</el-divider>
         <el-row :gutter="20">
@@ -420,7 +420,12 @@
           </el-col>
         </el-row>
         <el-row :gutter="20">
-          <el-col :span="24">
+          <el-col :span="12">
+            <el-form-item label="是否统计该学费单">
+              <el-switch v-model="manualPdfForm.include_in_statistics" active-text="是" inactive-text="否" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
             <el-form-item label="计算方式">
               <el-radio-group v-model="manualPdfForm.calculation_type" @change="handleCalculationTypeChange">
                 <el-radio-button label="yearly">全年</el-radio-button>
@@ -781,6 +786,7 @@ export default {
         due_date: '',
         start_date: '',
         end_date: '',
+        include_in_statistics: true,
         include_bus: true,
         bus_fee: 11000,
         calculation_type: 'yearly', // 'yearly' | 'semester_1' | 'semester_2'
@@ -1454,6 +1460,7 @@ export default {
         due_date: '',
         start_date: '',
         end_date: '',
+        include_in_statistics: true,
         include_bus: true,
         bus_fee: 11000,
         calculation_type: 'yearly',
@@ -1987,9 +1994,19 @@ export default {
           this.manualPdfLoading = true
           this.$message.info('正在生成PDF...')
 
+          // 为每个学生计算最终学费和分配校车费
+          const busStudents = this.manualPdfForm.students.filter(x => x.needs_school_bus)
+          const busFeePerStudent = busStudents.length > 0 ? this.manualPdfForm.bus_fee / busStudents.length : 0
+          const studentsWithFinal = this.manualPdfForm.students.map(s => ({
+            ...s,
+            final_tuition: this.calculateFinalAmount(s),
+            bus_fee: s.needs_school_bus ? (s.bus_fee || busFeePerStudent) : 0
+          }))
+
           // 构建请求数据
           const requestData = {
             ...this.manualPdfForm,
+            students: studentsWithFinal,
             bus_fee: this.manualPdfForm.include_bus ? this.manualPdfForm.bus_fee : 0
           }
 

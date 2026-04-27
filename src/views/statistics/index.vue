@@ -5,7 +5,7 @@
       <el-form :inline="true" :model="queryParams" class="demo-form-inline">
         <el-row :gutter="20">
           <el-col :span="6">
-            <el-form-item label="家庭编号：" style="width: 100%;">
+            <el-form-item label="invoice_no号码：" style="width: 100%;">
               <el-select
                 v-model="queryParams.invoice_no"
                 placeholder="请选择或输入家庭编号"
@@ -223,7 +223,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="家庭编号">
+            <el-form-item label="invoice_no号码">
               <el-input v-model="editForm.invoice_no" placeholder="请输入家庭编号" />
             </el-form-item>
           </el-col>
