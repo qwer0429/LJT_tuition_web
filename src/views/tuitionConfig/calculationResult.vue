@@ -379,7 +379,7 @@
     </el-dialog>
 
     <!-- 手动生成PDF对话框 -->
-    <el-dialog title="手动生成学费PDF" :visible.sync="manualPdfDialogVisible" width="900px" :close-on-click-modal="false">
+    <el-dialog title="手动生成学费PDF" :visible.sync="manualPdfDialogVisible" width="950px" :close-on-click-modal="false">
       <el-form ref="manualPdfForm" :model="manualPdfForm" :rules="manualPdfRules" label-width="140px">
         <el-divider content-position="left">基本信息</el-divider>
         <el-row :gutter="20">
@@ -407,14 +407,13 @@
           </el-col>
         </el-row>
         <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="学年开始日期">
-              <el-date-picker v-model="manualPdfForm.start_date" type="date" placeholder="选择日期" value-format="yyyy-MM-dd" style="width: 100%;" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="学年结束日期">
-              <el-date-picker v-model="manualPdfForm.end_date" type="date" placeholder="选择日期" value-format="yyyy-MM-dd" style="width: 100%;" />
+          <el-col :span="24">
+            <el-form-item label="计算方式">
+              <el-radio-group v-model="manualPdfForm.calculation_type" @change="handleCalculationTypeChange">
+                <el-radio-button label="yearly">全年</el-radio-button>
+                <el-radio-button label="semester_1">第一学期</el-radio-button>
+                <el-radio-button label="semester_2">第二学期</el-radio-button>
+              </el-radio-group>
             </el-form-item>
           </el-col>
         </el-row>
@@ -431,6 +430,16 @@
           </el-col>
         </el-row>
 
+        <el-row v-if="manualPdfForm.calculation_type === 'semester_1' || manualPdfForm.calculation_type === 'semester_2'" :gutter="20" style="margin-bottom: 10px;">
+          <el-col :span="24" style="text-align: right;">
+            <el-button type="primary" size="small" icon="el-icon-date" :loading="manualPdfLoading" @click="calculateCustomWorkingDays">
+              计算工作天数与折算学费
+            </el-button>
+            <span style="color: #909399; font-size: 12px; margin-left: 10px;">
+              根据就读日期范围计算实际到校日
+            </span>
+          </el-col>
+        </el-row>
         <el-divider content-position="left">学生信息</el-divider>
         <div v-for="(student, index) in manualPdfForm.students" :key="index" class="student-section">
           <el-card shadow="never" style="margin-bottom: 15px;">
@@ -451,7 +460,7 @@
               </el-col>
               <el-col :span="8">
                 <el-form-item label="年级" :prop="'students.' + index + '.grade'" :rules="{ required: true, message: '请输入年级', trigger: 'blur' }">
-                  <el-input v-model="student.grade" placeholder="如：M3B" />
+                  <el-input v-model="student.grade" placeholder="如：M3B" @blur="handleGradeBlur(index, student)" />
                 </el-form-item>
               </el-col>
             </el-row>
@@ -464,6 +473,35 @@
               <el-col :span="12">
                 <el-form-item label="注册费">
                   <el-input-number v-model="student.registration_fee" :min="0" :precision="2" style="width: 100%;" @change="calculateStudentDiscounts(index)" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <!-- 学期支付：学生个人就读日期 -->
+            <el-row v-if="manualPdfForm.calculation_type === 'semester_1' || manualPdfForm.calculation_type === 'semester_2'" :gutter="20">
+              <el-col :span="12">
+                <el-form-item label="就读开始日期">
+                  <el-date-picker v-model="student.custom_start_date" type="date" placeholder="默认使用学期开始日期" value-format="yyyy-MM-dd" style="width: 100%;" @change="calculateStudentDiscounts(index)" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="就读结束日期">
+                  <el-date-picker v-model="student.custom_end_date" type="date" placeholder="默认使用学期结束日期" value-format="yyyy-MM-dd" style="width: 100%;" @change="calculateStudentDiscounts(index)" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-row v-if="(manualPdfForm.calculation_type === 'semester_1' || manualPdfForm.calculation_type === 'semester_2') && student.working_days !== null" :gutter="20">
+              <el-col :span="12">
+                <el-form-item label="到校日">
+                  <div style="line-height: 36px; color: #409EFF; font-weight: bold;">
+                    {{ student.working_days }} / {{ student.total_working_days }} 天
+                  </div>
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="折算后学费">
+                  <div style="line-height: 36px; color: #67C23A; font-weight: bold;">
+                    ¥{{ formatMoney(student.prorated_tuition || student.base_tuition) }}
+                  </div>
                 </el-form-item>
               </el-col>
             </el-row>
@@ -696,12 +734,18 @@ export default {
         end_date: '',
         include_bus: true,
         bus_fee: 11000,
+        calculation_type: 'yearly', // 'yearly' | 'semester_1' | 'semester_2'
 
         students: [{
           english_name: '',
           student_no: '',
           grade: '',
           base_tuition: 165000,
+          custom_start_date: '',
+          custom_end_date: '',
+          working_days: null,
+          total_working_days: null,
+          prorated_tuition: null,
   
           sibling_discount_rate: 0,
           sibling_discount_amount: 0,
@@ -1355,12 +1399,19 @@ export default {
         end_date: '',
         include_bus: true,
         bus_fee: 11000,
+        calculation_type: 'yearly',
 
         students: [{
           english_name: '',
           student_no: '',
           grade: '',
           base_tuition: 165000,
+          registration_fee: 2000,
+          custom_start_date: '',
+          custom_end_date: '',
+          working_days: null,
+          total_working_days: null,
+          prorated_tuition: null,
   
           sibling_discount_rate: 0,
           sibling_discount_amount: 0,
@@ -1386,11 +1437,37 @@ export default {
 
     // 添加学生
     addStudent() {
+      const calcType = this.manualPdfForm.calculation_type
+      let defaultStart = ''
+      let defaultEnd = ''
+      let defaultWorkingDays = null
+      let defaultTotalDays = null
+      
+      // 学期支付时自动填充默认学期起止日期和到校日
+      if (calcType === 'semester_1' || calcType === 'semester_2') {
+        const semester = this.semesterOptions.find(s => 
+          (calcType === 'semester_1' && s.semester === 'First') ||
+          (calcType === 'semester_2' && s.semester === 'Second')
+        )
+        if (semester) {
+          defaultStart = semester.start_date || ''
+          defaultEnd = semester.end_date || ''
+          defaultWorkingDays = semester.total_teaching_days || 0
+          defaultTotalDays = semester.total_teaching_days || 0
+        }
+      }
+      
       this.manualPdfForm.students.push({
         english_name: '',
         student_no: '',
         grade: '',
         base_tuition: 165000,
+        registration_fee: 2000,
+        custom_start_date: defaultStart,
+        custom_end_date: defaultEnd,
+        working_days: defaultWorkingDays,
+        total_working_days: defaultTotalDays,
+        prorated_tuition: null,
 
         sibling_discount_rate: 0,
         sibling_discount_amount: 0,
@@ -1462,10 +1539,143 @@ export default {
       }
     },
 
+    // 处理计算方式变更
+    handleCalculationTypeChange(type) {
+      // 根据计算方式切换默认校车费
+      if (type === 'yearly') {
+        this.manualPdfForm.bus_fee = 11000
+        // 全年支付：清空学期相关日期和工作天数
+        this.manualPdfForm.students.forEach(s => {
+          s.custom_start_date = ''
+          s.custom_end_date = ''
+          s.working_days = null
+          s.total_working_days = null
+          s.prorated_tuition = null
+        })
+      } else if (type === 'semester_1') {
+        this.manualPdfForm.bus_fee = 5900
+        // 第一学期：自动填充默认学期起止日期和到校日
+        const semester = this.semesterOptions.find(s => s.semester === 'First')
+        if (semester && semester.start_date && semester.end_date) {
+          this.manualPdfForm.students.forEach(s => {
+            s.custom_start_date = semester.start_date
+            s.custom_end_date = semester.end_date
+            s.working_days = semester.total_teaching_days || 0
+            s.total_working_days = semester.total_teaching_days || 0
+            s.prorated_tuition = null
+            s.bus_fee = null
+          })
+        }
+      } else if (type === 'semester_2') {
+        this.manualPdfForm.bus_fee = 5100
+        // 第二学期：自动填充默认学期起止日期和到校日
+        const semester = this.semesterOptions.find(s => s.semester === 'Second')
+        if (semester && semester.start_date && semester.end_date) {
+          this.manualPdfForm.students.forEach(s => {
+            s.custom_start_date = semester.start_date
+            s.custom_end_date = semester.end_date
+            s.working_days = semester.total_teaching_days || 0
+            s.total_working_days = semester.total_teaching_days || 0
+            s.prorated_tuition = null
+            s.bus_fee = null
+          })
+        }
+      }
+    },
+
+    // 计算学期就读期间工作天数（调用后端）
+    async calculateCustomWorkingDays() {
+      const calcType = this.manualPdfForm.calculation_type
+      if (calcType !== 'semester_1' && calcType !== 'semester_2') return
+      
+      // 获取当前学期配置
+      const semester = this.semesterOptions.find(s => 
+        (calcType === 'semester_1' && s.semester === 'First') ||
+        (calcType === 'semester_2' && s.semester === 'Second')
+      )
+      const semesterStart = semester ? semester.start_date : ''
+      const semesterEnd = semester ? semester.end_date : ''
+      const semesterTotalDays = semester ? (semester.total_teaching_days || 0) : 0
+      
+      if (!semesterStart || !semesterEnd) {
+        this.$message.warning('未找到学期配置，请先选择学年')
+        return
+      }
+
+      this.manualPdfLoading = true
+      try {
+        for (let i = 0; i < this.manualPdfForm.students.length; i++) {
+          const student = this.manualPdfForm.students[i]
+          // 使用学生自定义日期，默认使用学期日期
+          const start = student.custom_start_date || semesterStart
+          const end = student.custom_end_date || semesterEnd
+          
+          const res = await this.$http.post('/tuition/calculate/', {
+            action: 'calculate_tuition_period_days',
+            tuition_period: `${start.replace(/-/g, '.')}-${end.replace(/-/g, '.')}`,
+            academic_year: this.manualPdfForm.academic_year,
+            registration_fee: student.registration_fee || 0
+          })
+          
+          // 兼容响应格式：res.code 或 res.data.code
+          const responseCode = res.code !== undefined ? res.code : (res.data ? res.data.code : null)
+          const responseData = res.data !== undefined ? (res.data.data || res.data) : res
+          
+          if (responseCode === 1) {
+            const data = responseData
+            student.working_days = data.working_days || 0
+            // 使用学期总教学日作为分母，确保比例计算准确
+            student.total_working_days = semesterTotalDays || data.total_working_days || data.total_days || 0
+            
+            // 按到校日比例折算基础学费
+            const baseTuition = student.base_tuition || 0
+            if (data.is_new_student && data.academic_year_days > 0) {
+              // 新生学期计算：基础学费 × 1.1 ÷ 学年总到校日 × 到校日
+              student.prorated_tuition = parseFloat(
+                (baseTuition * 1.1 / data.academic_year_days * student.working_days).toFixed(2)
+              )
+              // 新生学期校车费 = 学期固定校车费 ÷ 学期总教学日 × 到校日
+              const semesterBusFee = calcType === 'semester_1' ? 5900 : 5100
+              student.bus_fee = parseFloat(
+                (semesterBusFee / student.total_working_days * student.working_days).toFixed(2)
+              )
+            } else if (student.working_days > 0 && student.total_working_days > 0) {
+              // 普通学生：基础学费 × 到校日 / 学期总到校日
+              student.prorated_tuition = parseFloat(
+                (baseTuition * student.working_days / student.total_working_days).toFixed(2)
+              )
+              student.bus_fee = null
+            } else {
+              student.prorated_tuition = baseTuition
+              student.bus_fee = null
+            }
+          }
+        }
+        
+        // 更新全局校车费（根据每个学生的计算结果汇总）
+        const defaultBusFee = calcType === 'semester_1' ? 5900 : 5100
+        let totalBusFee = 0
+        this.manualPdfForm.students.forEach(s => {
+          if (s.needs_school_bus) {
+            totalBusFee += s.bus_fee || defaultBusFee
+          }
+        })
+        this.manualPdfForm.bus_fee = parseFloat(totalBusFee.toFixed(2))
+        
+        this.$message.success('工作天数与校车费计算完成')
+      } catch (error) {
+        console.error('计算工作天数失败:', error)
+        this.$message.error('计算工作天数失败')
+      } finally {
+        this.manualPdfLoading = false
+      }
+    },
+
     // 计算学生折扣金额（折上折）
     calculateStudentDiscounts(index) {
       const student = this.manualPdfForm.students[index]
-      const baseTuition = student.base_tuition || 0
+      // 自定义期间使用折算后学费作为计算基数
+      const baseTuition = student.prorated_tuition || student.base_tuition || 0
       let currentAmount = baseTuition
 
       // 折上折计算：每个折扣基于上一次折扣后的金额
@@ -1525,7 +1735,7 @@ export default {
 
     // 计算最终金额
     calculateFinalAmount(student) {
-      const baseTuition = student.base_tuition || 0
+      const baseTuition = student.prorated_tuition || student.base_tuition || 0
       const registrationFee = student.registration_fee || 0
 
       // 优先级：奖学金定额 > 助学金定额 > 比例折扣
@@ -1545,13 +1755,64 @@ export default {
     // 获取计算详情文本
     getCalculationDetail(student) {
       const registrationFee = student.registration_fee || 0
+      const calcBase = student.prorated_tuition || student.base_tuition || 0
+      const baseLabel = student.prorated_tuition ? '折算后' : '基础'
       if (student.scholarship_type === 'fixed') {
         return `奖学金定额 ${student.scholarship_amount || 0} + 注册费 ${registrationFee}`
       } else if (student.financial_aid_type === 'fixed') {
         return `助学金定额 ${student.financial_aid || 0} + 注册费 ${registrationFee}`
       } else {
         const totalDiscount = this.getTotalDiscountAmount(student)
-        return `基础 ${student.base_tuition || 0} - 折扣 ${totalDiscount} + 注册费 ${registrationFee}`
+        return `${baseLabel} ${calcBase} - 折扣 ${totalDiscount} + 注册费 ${registrationFee}`
+      }
+    },
+
+    // 年级输入框失去焦点时自动匹配学费配置
+    async handleGradeBlur(index, student) {
+      const grade = student.grade ? student.grade.trim().toUpperCase() : ''
+      if (!grade) return
+      
+      try {
+        const res = await this.$http.get('/gradetuitionconfig/', {
+          params: {
+            search: grade,
+            academic_year: this.manualPdfForm.academic_year,
+            is_active: true
+          }
+        })
+        
+        let results = []
+        if (Array.isArray(res)) {
+          results = res
+        } else if (res.results) {
+          results = res.results
+        } else if (res.data) {
+          results = Array.isArray(res.data) ? res.data : []
+        }
+        
+        // 查找匹配的年级配置（优先精确匹配，其次前缀匹配）
+        let matched = null
+        for (const config of results) {
+          const configGrade = (config.grade_name || '').toUpperCase()
+          if (configGrade === grade) {
+            matched = config
+            break
+          }
+          if (grade.startsWith(configGrade) || configGrade.startsWith(grade)) {
+            matched = config
+            break
+          }
+        }
+        
+        if (matched) {
+          student.base_tuition = parseFloat(matched.base_tuition) || 165000
+          if (matched.registration_fee !== undefined && matched.registration_fee !== null) {
+            student.registration_fee = parseFloat(matched.registration_fee)
+          }
+          this.$message.success(`已自动匹配年级「${matched.grade_name}」的学费配置`)
+        }
+      } catch (err) {
+        console.error('查询年级学费配置失败:', err)
       }
     },
 

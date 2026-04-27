@@ -44,7 +44,7 @@
           </el-col>
           <el-col :span="6">
             <el-form-item label="学年：" style="width: 100%;">
-              <el-select v-model="queryParams.academic_year" placeholder="全部" clearable style="width: 100%;" @change="handleQuery">
+              <el-select v-model="queryParams.academic_year" placeholder="全部" clearable style="width: 100%;" @change="handleAcademicYearChange">
                 <el-option v-for="year in academicYearOptions" :key="year" :label="year" :value="year" />
               </el-select>
             </el-form-item>
@@ -163,10 +163,9 @@
           </template>
         </el-table-column>
         <el-table-column prop="payer_name" label="付款方" align="center" min-width="120" />
-        <el-table-column label="操作" align="center" width="180" fixed="right">
+        <el-table-column label="操作" align="center" width="160" fixed="right">
           <template slot-scope="scope">
-            <el-button type="text" size="small" @click="handleView(scope.row)">查看</el-button>
-            <el-button type="text" size="small" @click="handleEdit(scope.row)">编辑</el-button>
+            <el-button type="text" size="small" @click="handleEdit(scope.row)">查看详情</el-button>
             <el-button type="text" size="small" style="color: #f56c6c;" @click="handleDelete(scope.row)">删除</el-button>
           </template>
         </el-table-column>
@@ -188,11 +187,11 @@
       />
     </div>
 
-    <!-- 详情对话框 -->
-    <el-dialog title="缴费详情" :visible.sync="detailDialogVisible" width="700px">
-      <div v-if="currentRow" style="text-align: right; margin-bottom: 15px;">
+    <!-- 编辑对话框 -->
+    <el-dialog title="查看详情" :visible.sync="editDialogVisible" width="900px">
+      <div style="text-align: right; margin-bottom: 15px;">
         <el-button
-          v-if="currentRow.tuition_pdf_url"
+          v-if="editForm.tuition_pdf_url"
           type="primary"
           size="small"
           icon="el-icon-view"
@@ -202,83 +201,40 @@
         </el-button>
         <el-button v-else type="info" size="small" disabled icon="el-icon-document">暂无学费单PDF</el-button>
       </div>
-      <el-descriptions :column="2" border v-if="currentRow">
-        <el-descriptions-item label="学生姓名">{{ currentRow.student_name }}</el-descriptions-item>
-        <el-descriptions-item label="学号">{{ currentRow.student_no }}</el-descriptions-item>
-        <el-descriptions-item label="年级">{{ currentRow.grade }}</el-descriptions-item>
-        <el-descriptions-item label="家庭编号">{{ currentRow.invoice_no }}</el-descriptions-item>
-        <el-descriptions-item label="学费期间">{{ currentRow.tuition_period }}</el-descriptions-item>
-        <el-descriptions-item label="学费期间天数">{{ currentRow.tuition_days || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="标准学费">¥{{ formatMoney(currentRow.base_tuition) }}</el-descriptions-item>
-        <el-descriptions-item label="家庭折扣">
-          <span v-if="currentRow.family_discount > 0" style="color: #E6A23C;">¥{{ formatMoney(currentRow.family_discount) }}</span>
-          <span v-else>-</span>
-        </el-descriptions-item>
-        <el-descriptions-item label="其他折扣">
-          <span v-if="currentRow.other_discount > 0" style="color: #E6A23C;">¥{{ formatMoney(currentRow.other_discount) }}</span>
-          <span v-else>-</span>
-        </el-descriptions-item>
-        <el-descriptions-item label="应付学费">¥{{ formatMoney(currentRow.tuition_payable) }}</el-descriptions-item>
-        <el-descriptions-item label="已付学费">¥{{ formatMoney(currentRow.paid_tuition_fee) }}</el-descriptions-item>
-        <el-descriptions-item label="校车费">¥{{ formatMoney(currentRow.school_bus_fee) }}</el-descriptions-item>
-        <el-descriptions-item label="已付校车费">¥{{ formatMoney(currentRow.paid_bus_fee) }}</el-descriptions-item>
-        <el-descriptions-item label="宿舍费">¥{{ formatMoney(currentRow.dormitory_fee) }}</el-descriptions-item>
-        <el-descriptions-item label="已付宿舍费">¥{{ formatMoney(currentRow.paid_dormitory_fee) }}</el-descriptions-item>
-        <el-descriptions-item label="应付总额" :span="2">
-          <span style="font-weight: bold; font-size: 16px;">¥{{ formatMoney(currentRow.total_payable) }}</span>
-        </el-descriptions-item>
-        <el-descriptions-item label="已付总额" :span="2">
-          <span style="color: #67C23A; font-weight: bold; font-size: 16px;">¥{{ formatMoney(currentRow.total_paid) }}</span>
-        </el-descriptions-item>
-        <el-descriptions-item label="欠款金额" :span="2">
-          <span :style="currentRow.balance_due > 0 ? 'color: #F56C6C; font-weight: bold; font-size: 16px;' : ''">
-            ¥{{ formatMoney(currentRow.balance_due) }}
-          </span>
-        </el-descriptions-item>
-        <el-descriptions-item label="付款日期">{{ currentRow.paid_date || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="付款方">{{ currentRow.payer_name || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="凭证号(学费)">{{ currentRow.tuition_voucher_no || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="凭证号(校车)">{{ currentRow.bus_voucher_no || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="发票号码">{{ currentRow.invoice_number || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="发票金额">¥{{ formatMoney(currentRow.invoice_amount) }}</el-descriptions-item>
-        <el-descriptions-item label="备注" :span="2">{{ currentRow.remark || '-' }}</el-descriptions-item>
-      </el-descriptions>
-    </el-dialog>
-
-    <!-- 编辑对话框 -->
-    <el-dialog title="编辑缴费记录" :visible.sync="editDialogVisible" width="900px">
       <el-form ref="editForm" :model="editForm" label-width="130px">
         <!-- 基础信息 -->
         <el-divider content-position="left">基础信息</el-divider>
         <el-row :gutter="20">
-          <el-col :span="8">
+          <el-col :span="12">
             <el-form-item label="序号">
               <el-input-number v-model="editForm.seq_no" :min="0" :precision="0" style="width: 100%;" />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="12">
             <el-form-item label="学生姓名">
               <el-input v-model="editForm.student_name" placeholder="请输入学生姓名" />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
             <el-form-item label="学号">
               <el-input v-model="editForm.student_no" placeholder="请输入学号" />
             </el-form-item>
           </el-col>
-        </el-row>
-        <el-row :gutter="20">
-          <el-col :span="8">
+          <el-col :span="12">
             <el-form-item label="家庭编号">
               <el-input v-model="editForm.invoice_no" placeholder="请输入家庭编号" />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
             <el-form-item label="学费期间">
-              <el-input v-model="editForm.tuition_period" placeholder="如：2026-08-17~2027-06-18" />
+              <div class="readonly-field">{{ editForm.tuition_period || '-' }}</div>
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="12">
             <el-form-item label="年级">
               <el-input v-model="editForm.grade" placeholder="请输入年级" />
             </el-form-item>
@@ -288,41 +244,43 @@
         <!-- 学费信息 -->
         <el-divider content-position="left">学费信息（由学费单生成，只读）</el-divider>
         <el-row :gutter="20">
-          <el-col :span="8">
+          <el-col :span="12">
             <el-form-item label="学费期间天数">
               <div class="readonly-field">{{ editForm.tuition_days || '-' }} 天</div>
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="12">
             <el-form-item label="标准学费">
               <div class="readonly-field">¥{{ formatMoney(editForm.base_tuition) }}</div>
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
             <el-form-item label="注册费">
               <div class="readonly-field">¥{{ formatMoney(editForm.registration_fee) }}</div>
             </el-form-item>
           </el-col>
-        </el-row>
-        <el-row :gutter="20">
-          <el-col :span="8">
+          <el-col :span="12">
             <el-form-item label="家庭折扣">
               <div class="readonly-field">¥{{ formatMoney(editForm.family_discount) }}</div>
             </el-form-item>
           </el-col>
         </el-row>
         <el-row :gutter="20">
-          <el-col :span="8">
+          <el-col :span="12">
             <el-form-item label="其他折扣">
               <div class="readonly-field">¥{{ formatMoney(editForm.other_discount) }}</div>
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="12">
             <el-form-item label="应付学费">
               <div class="readonly-field highlight">¥{{ formatMoney(editForm.tuition_payable) }}</div>
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
             <el-form-item label="已付学费">
               <el-input-number v-model="editForm.paid_tuition_fee" :min="0" :precision="2" :controls="false" style="width: 100%;" @change="calculateEditBalance" />
             </el-form-item>
@@ -332,23 +290,32 @@
         <!-- 校车费信息 -->
         <el-divider content-position="left">校车费信息</el-divider>
         <el-row :gutter="20">
-          <el-col :span="8">
+          <el-col :span="12">
             <el-form-item label="校车费期间">
-              <el-input v-model="editForm.bus_fee_period" placeholder="请输入校车费期间" />
+              <el-date-picker
+                v-model="editForm.busFeePeriodRange"
+                type="daterange"
+                range-separator="-"
+                start-placeholder="开始日期"
+                end-placeholder="结束日期"
+                value-format="yyyy-MM-dd"
+                style="width: 100%;"
+                @change="val => handlePeriodChange('bus', val)"
+              />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="12">
             <el-form-item label="校车费">
               <el-input-number v-model="editForm.school_bus_fee" :min="0" :precision="2" :controls="false" style="width: 100%;" @change="calculateEditBalance" />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
             <el-form-item label="已付校车费">
               <el-input-number v-model="editForm.paid_bus_fee" :min="0" :precision="2" :controls="false" style="width: 100%;" @change="calculateEditBalance" />
             </el-form-item>
           </el-col>
-        </el-row>
-        <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="凭证号(校车)">
               <el-input v-model="editForm.bus_voucher_no" placeholder="请输入凭证号" />
@@ -359,23 +326,32 @@
         <!-- 宿舍费信息 -->
         <el-divider content-position="left">宿舍费信息</el-divider>
         <el-row :gutter="20">
-          <el-col :span="8">
+          <el-col :span="12">
             <el-form-item label="住宿费期间">
-              <el-input v-model="editForm.dormitory_period" placeholder="请输入住宿费期间" />
+              <el-date-picker
+                v-model="editForm.dormitoryPeriodRange"
+                type="daterange"
+                range-separator="-"
+                start-placeholder="开始日期"
+                end-placeholder="结束日期"
+                value-format="yyyy-MM-dd"
+                style="width: 100%;"
+                @change="val => handlePeriodChange('dormitory', val)"
+              />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="12">
             <el-form-item label="宿舍费">
               <el-input-number v-model="editForm.dormitory_fee" :min="0" :precision="2" :controls="false" style="width: 100%;" @change="calculateEditBalance" />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
             <el-form-item label="已付宿舍费">
               <el-input-number v-model="editForm.paid_dormitory_fee" :min="0" :precision="2" :controls="false" style="width: 100%;" @change="calculateEditBalance" />
             </el-form-item>
           </el-col>
-        </el-row>
-        <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="凭证号(宿舍)">
               <el-input v-model="editForm.dormitory_voucher_no" placeholder="请输入凭证号" />
@@ -386,34 +362,36 @@
         <!-- 付款与欠款 -->
         <el-divider content-position="left">付款与欠款</el-divider>
         <el-row :gutter="20">
-          <el-col :span="8">
+          <el-col :span="12">
             <el-form-item label="付款日期">
               <el-date-picker v-model="editForm.paid_date" type="date" placeholder="选择日期" value-format="yyyy-MM-dd" style="width: 100%;" />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="12">
             <el-form-item label="欠款">
               <div class="readonly-field" :style="editForm.balance_due > 0 ? 'color: #F56C6C; font-weight: bold;' : ''">¥{{ formatMoney(editForm.balance_due) }}</div>
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
             <el-form-item label="实付金额">
               <div class="readonly-field highlight">¥{{ formatMoney(editForm.actual_paid_amount) }}</div>
             </el-form-item>
           </el-col>
-        </el-row>
-        <el-row :gutter="20">
-          <el-col :span="8">
+          <el-col :span="12">
             <el-form-item label="付款方">
               <el-input v-model="editForm.payer_name" placeholder="请输入付款方" />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
             <el-form-item label="卡号">
               <el-input v-model="editForm.card_no" placeholder="请输入卡号" />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="12">
             <el-form-item label="银行">
               <el-input v-model="editForm.bank_name" placeholder="请输入银行" />
             </el-form-item>
@@ -423,17 +401,19 @@
         <!-- 发票信息 -->
         <el-divider content-position="left">发票信息</el-divider>
         <el-row :gutter="20">
-          <el-col :span="8">
+          <el-col :span="12">
             <el-form-item label="发票号码">
               <el-input v-model="editForm.invoice_number" placeholder="请输入发票号码" />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="12">
             <el-form-item label="开票金额">
               <el-input-number v-model="editForm.invoice_amount" :min="0" :precision="2" :controls="false" style="width: 100%;" />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
             <el-form-item label="发票内容">
               <el-input v-model="editForm.invoice_content" placeholder="请输入发票内容" />
             </el-form-item>
@@ -443,7 +423,7 @@
         <!-- 凭证号(学费) -->
         <el-divider content-position="left">凭证信息</el-divider>
         <el-row :gutter="20">
-          <el-col :span="8">
+          <el-col :span="12">
             <el-form-item label="凭证号(学费)">
               <el-input v-model="editForm.tuition_voucher_no" placeholder="请输入凭证号" />
             </el-form-item>
@@ -472,11 +452,22 @@
     </el-dialog>
 
     <!-- 导出对话框 -->
-    <el-dialog title="导出学费统计" :visible.sync="exportDialogVisible" width="400px">
-      <el-form label-width="80px">
+    <el-dialog title="导出学费统计" :visible.sync="exportDialogVisible" width="450px">
+      <el-form label-width="100px">
         <el-form-item label="学年">
           <el-select v-model="exportAcademicYear" placeholder="请选择学年" style="width: 100%;">
             <el-option v-for="year in academicYearOptions" :key="year" :label="year" :value="year" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="导出年级">
+          <el-select
+            v-model="exportGrades"
+            multiple
+            collapse-tags
+            placeholder="不选则导出全部，多选则每个年级一个工作表"
+            style="width: 100%;"
+          >
+            <el-option v-for="grade in sortedGradeOptions" :key="grade" :label="grade" :value="grade" />
           </el-select>
         </el-form-item>
       </el-form>
@@ -515,7 +506,6 @@ export default {
       recordList: [],
       total: 0,
       tableHeight: 600,
-      detailDialogVisible: false,
       currentRow: null,
       pdfZoomDialogVisible: false,
       zoomPdfUrl: '',
@@ -523,6 +513,7 @@ export default {
       editLoading: false,
       exportDialogVisible: false,
       exportAcademicYear: '',
+      exportGrades: [],
       editForm: {
         id: null,
         seq_no: null,
@@ -530,6 +521,7 @@ export default {
         student_name: '',
         invoice_no: '',
         tuition_period: '',
+        tuitionPeriodRange: [],
         grade: '',
         base_tuition: 0,
         registration_fee: 0,
@@ -538,8 +530,10 @@ export default {
         tuition_payable: 0,
         tuition_days: 0,
         bus_fee_period: '',
+        busFeePeriodRange: [],
         school_bus_fee: 0,
         dormitory_period: '',
+        dormitoryPeriodRange: [],
         dormitory_fee: 0,
         tuition_voucher_no: '',
         paid_tuition_fee: 0,
@@ -559,6 +553,26 @@ export default {
         samsung_special_remark: '',
         remark: ''
       }
+    }
+  },
+  computed: {
+    sortedGradeOptions() {
+      const orderMap = {
+        'Nursery': 1, 'ECEA': 2, 'ECEB': 3,
+        'P1': 10, 'P2': 11, 'P3': 12, 'P4': 13, 'P5': 14, 'P6': 15,
+        'M1': 20, 'M2': 21, 'M3': 22, 'M4': 23, 'M5': 24,
+        'DP1': 30, 'DP2': 31
+      }
+      const getOrder = (grade) => {
+        if (!grade) return 999
+        const clean = grade.trim()
+        if (orderMap[clean]) return orderMap[clean]
+        for (const g in orderMap) {
+          if (clean.startsWith(g)) return orderMap[g]
+        }
+        return 999
+      }
+      return [...this.gradeOptions].sort((a, b) => getOrder(a) - getOrder(b))
     }
   },
   created() {
@@ -587,6 +601,7 @@ export default {
     async initData() {
       await this.loadAcademicYearOptions()
       await this.loadGrades()
+      await this.loadAllFamilies()
       this.loadRecordList()
     },
 
@@ -632,6 +647,38 @@ export default {
       }
     },
 
+    // 加载所有家庭编号（用于下拉搜索，不受分页限制）
+    async loadAllFamilies() {
+      try {
+        const params = { type: 'families' }
+        if (this.queryParams.academic_year) {
+          params.academic_year = this.queryParams.academic_year
+        }
+        const res = await this.$http.get('/tuition/calculate/', { params })
+        let dataList = []
+        if (Array.isArray(res)) {
+          dataList = res
+        } else if (res.code === 1 && res.data) {
+          if (Array.isArray(res.data)) {
+            dataList = res.data
+          } else if (res.data.families) {
+            const families = res.data.families
+            if (Array.isArray(families)) {
+              dataList = families
+            } else if (typeof families === 'object') {
+              dataList = [...(families.all_yearly || []), ...(families.all_semester || []), ...(families.mixed || [])]
+            }
+          }
+        } else if (res.results && Array.isArray(res.results)) {
+          dataList = res.results
+        }
+        this.familyOptions = dataList
+      } catch (error) {
+        console.error('加载家庭编号列表失败:', error)
+        this.familyOptions = []
+      }
+    },
+
     // 加载记录列表
     async loadRecordList() {
       this.loading = true
@@ -670,8 +717,6 @@ export default {
           this.total = 0
         }
         
-        // 提取家庭编号选项
-        this.familyOptions = [...new Set(this.recordList.map(r => r.invoice_no).filter(Boolean))]
       } catch (error) {
         console.error('加载记录列表失败:', error)
         this.$message.error('加载数据失败')
@@ -694,6 +739,13 @@ export default {
         total_payable: tuitionPayable + busFee + dormFee,
         total_paid: tuitionPaid + busPaid + dormPaid
       }
+    },
+
+    // 学年变化处理
+    async handleAcademicYearChange() {
+      this.queryParams.page = 1
+      await this.loadAllFamilies()
+      this.loadRecordList()
     },
 
     // 查询
@@ -732,17 +784,10 @@ export default {
       this.loadRecordList()
     },
 
-    // 查看详情
-    handleView(row) {
-      this.currentRow = row
-      console.log('[PDF Debug] tuition_pdf_url:', row.tuition_pdf_url, 'tuition_pdf:', row.tuition_pdf)
-      this.detailDialogVisible = true
-    },
-
     // 打开放大PDF
     openPdfZoom() {
-      if (this.currentRow && this.currentRow.tuition_pdf_url) {
-        window.open(this.currentRow.tuition_pdf_url, '_blank')
+      if (this.editForm && this.editForm.tuition_pdf_url) {
+        window.open(this.editForm.tuition_pdf_url, '_blank')
       }
     },
 
@@ -763,6 +808,7 @@ export default {
         student_name: row.student_name || '',
         invoice_no: row.invoice_no || '',
         tuition_period: row.tuition_period || '',
+        tuitionPeriodRange: this.parsePeriodString(row.tuition_period),
         tuition_days: numeric(row.tuition_days),
         grade: row.grade || '',
         base_tuition: numeric(row.base_tuition),
@@ -771,8 +817,10 @@ export default {
         other_discount: numeric(row.other_discount),
         tuition_payable: numeric(row.tuition_payable),
         bus_fee_period: row.bus_fee_period || '',
+        busFeePeriodRange: this.parsePeriodString(row.bus_fee_period),
         school_bus_fee: numeric(row.school_bus_fee),
         dormitory_period: row.dormitory_period || '',
+        dormitoryPeriodRange: this.parsePeriodString(row.dormitory_period),
         dormitory_fee: numeric(row.dormitory_fee),
         tuition_voucher_no: row.tuition_voucher_no || '',
         paid_tuition_fee: numeric(row.paid_tuition_fee),
@@ -790,7 +838,8 @@ export default {
         invoice_amount: numeric(row.invoice_amount),
         invoice_content: row.invoice_content || '',
         samsung_special_remark: row.samsung_special_remark || '',
-        remark: row.remark || ''
+        remark: row.remark || '',
+        tuition_pdf_url: row.tuition_pdf_url || ''
       }
       this.editDialogVisible = true
       this.$nextTick(() => {
@@ -808,6 +857,54 @@ export default {
       const paidDorm = parseFloat(this.editForm.paid_dormitory_fee) || 0
       this.editForm.balance_due = (tuition + bus + dorm - paidTuition - paidBus - paidDorm).toFixed(2)
       this.editForm.actual_paid_amount = (paidTuition + paidBus + paidDorm).toFixed(2)
+    },
+
+    // 解析期间字符串为日期数组，格式：2026.8.17-2026.6.18
+    parsePeriodString(periodStr) {
+      if (!periodStr) return []
+      const parts = periodStr.split('-')
+      if (parts.length !== 2) return []
+      const start = this.parseDotDate(parts[0])
+      const end = this.parseDotDate(parts[1])
+      return start && end ? [start, end] : []
+    },
+
+    // 解析点号日期格式 2026.8.17 → 2026-08-17
+    parseDotDate(str) {
+      if (!str) return null
+      const parts = str.trim().split('.')
+      if (parts.length !== 3) return null
+      const [y, m, d] = parts.map(Number)
+      if (!y || !m || !d) return null
+      return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+    },
+
+    // 格式化日期数组为点号字符串
+    formatPeriodString(dateArr) {
+      if (!dateArr || dateArr.length !== 2) return null
+      const start = this.formatDotDate(dateArr[0])
+      const end = this.formatDotDate(dateArr[1])
+      return start && end ? `${start}-${end}` : null
+    },
+
+    // 格式化 yyyy-MM-dd → yyyy.M.d
+    formatDotDate(dateStr) {
+      if (!dateStr) return null
+      const parts = dateStr.split('-')
+      if (parts.length !== 3) return null
+      const [y, m, d] = parts.map(Number)
+      return `${y}.${m}.${d}`
+    },
+
+    // 日期范围选择器变化处理
+    handlePeriodChange(type, val) {
+      if (type === 'tuition') {
+        this.editForm.tuition_period = this.formatPeriodString(val)
+      } else if (type === 'bus') {
+        this.editForm.bus_fee_period = this.formatPeriodString(val)
+      } else if (type === 'dormitory') {
+        this.editForm.dormitory_period = this.formatPeriodString(val)
+      }
     },
 
     // 提交编辑
@@ -883,6 +980,7 @@ export default {
     // 打开导出对话框
     handleExport() {
       this.exportAcademicYear = this.queryParams.academic_year || ''
+      this.exportGrades = []
       this.exportDialogVisible = true
     },
 
@@ -894,13 +992,24 @@ export default {
       }
       try {
         this.$message.info('正在导出，请稍候...')
-        const res = await exportTuitionPayment({ academic_year: this.exportAcademicYear })
+        const params = { academic_year: this.exportAcademicYear }
+        if (this.exportGrades && this.exportGrades.length > 0) {
+          params.grades = this.exportGrades.join(',')
+        }
+        const res = await exportTuitionPayment(params)
         
         // 创建下载链接
         const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
         const link = document.createElement('a')
         link.href = URL.createObjectURL(blob)
-        link.download = `学费统计_${this.exportAcademicYear}_${new Date().toISOString().slice(0, 10)}.xlsx`
+        let gradeSuffix = ''
+        if (this.exportGrades && this.exportGrades.length > 0) {
+          const names = this.exportGrades.slice(0, 3).join('_')
+          gradeSuffix = this.exportGrades.length > 3
+            ? `_${names}等${this.exportGrades.length}个年级`
+            : `_${names}`
+        }
+        link.download = `学费统计_${this.exportAcademicYear}${gradeSuffix}_${new Date().toISOString().slice(0, 10)}.xlsx`
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
