@@ -59,18 +59,10 @@
               <el-input-number v-model="configForm.sibling_discount_3rd" :min="0" :max="100" :precision="2" style="width: 100%;" />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
-            <el-form-item label="公司折扣(%)">
-              <el-input-number v-model="configForm.company_discount_rate" :min="0" :max="100" :precision="2" style="width: 100%;" />
-            </el-form-item>
-          </el-col>
+          <!-- 公司折扣(%) 已隐藏，使用学生级别的公司折扣 -->
         </el-row>
         <el-row :gutter="20">
-          <el-col :span="8">
-            <el-form-item label="校友折扣(%)">
-              <el-input-number v-model="configForm.alumni_discount_rate" :min="0" :max="100" :precision="2" style="width: 100%;" />
-            </el-form-item>
-          </el-col>
+          <!-- 校友折扣(%) 已隐藏，使用学生级别的校友折扣 -->
           <el-col :span="8">
             <el-form-item label="教师子弟折扣(%)">
               <el-input-number v-model="configForm.teacher_discount_rate" :min="0" :max="100" :precision="2" style="width: 100%;" />

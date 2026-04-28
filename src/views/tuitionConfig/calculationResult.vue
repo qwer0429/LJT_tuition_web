@@ -401,11 +401,7 @@
               <el-input v-model="manualPdfForm.invoice_no" placeholder="如：XLIS 2026-2027 0184" />
             </el-form-item>
           </el-col>
-          <el-col :span="12">
-            <el-form-item label="家庭名称" prop="family_name">
-              <el-input v-model="manualPdfForm.family_name" placeholder="如：Zhang Family" />
-            </el-form-item>
-          </el-col>
+          <!-- 家庭名称已移除，由系统根据学生姓名自动生成 -->
         </el-row>
         <el-row :gutter="20">
           <el-col :span="12">
@@ -825,7 +821,6 @@ export default {
       },
       manualPdfRules: {
         invoice_no: [{ required: true, message: '请输入发票编号', trigger: 'blur' }],
-        family_name: [{ required: true, message: '请输入家庭名称', trigger: 'blur' }],
         academic_year: [{ required: true, message: '请输入学年', trigger: 'blur' }]
       }
     }
@@ -1928,6 +1923,18 @@ export default {
 
       const student = this.manualPdfForm.students[index]
 
+      // 自动填充发票编号（仅当为空时，避免覆盖用户手动输入）
+      if (!this.manualPdfForm.invoice_no) {
+        if (selected.invoice_no) {
+          this.manualPdfForm.invoice_no = selected.invoice_no
+        } else if (selected.family_number) {
+          // 根据家庭编号自动生成发票编号
+          const academicYear = this.manualPdfForm.academic_year || '2026-2027'
+          const paddedNumber = String(selected.family_number).trim().padStart(4, '0')
+          this.manualPdfForm.invoice_no = `XLIS ${academicYear} ${paddedNumber}`
+        }
+      }
+
       // 基础信息
       student.english_name = selected.student_name || ''
       student.student_no = selected.student_no_xf || ''
@@ -2000,6 +2007,12 @@ export default {
         try {
           this.manualPdfLoading = true
           this.$message.info('正在生成PDF...')
+
+          // 自动构造家庭名称（从第一个学生的英文名）
+          if (!this.manualPdfForm.family_name) {
+            const firstStudent = this.manualPdfForm.students[0]
+            this.manualPdfForm.family_name = firstStudent && firstStudent.english_name ? `${firstStudent.english_name}'s Family` : ''
+          }
 
           // 为每个学生计算最终学费和分配校车费
           const busStudents = this.manualPdfForm.students.filter(x => x.needs_school_bus)
