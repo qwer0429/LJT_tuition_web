@@ -186,11 +186,11 @@
                 {{ tuitionForm.student_name }}
                 <span v-if="tuitionForm.student_no_xf" style="color: #909399; font-size: 12px;">({{ tuitionForm.student_no_xf }})</span>
               </div>
-              <el-select 
-                v-else 
-                v-model="tuitionForm.student" 
-                placeholder="请选择已有学生（可选）" 
-                filterable 
+              <el-select
+                v-else
+                v-model="tuitionForm.student"
+                placeholder="请选择已有学生（可选）"
+                filterable
                 clearable
                 style="width: 100%;"
                 @change="handleStudentSelect"
@@ -401,7 +401,7 @@
 
     <!-- 发送邮件对话框 -->
     <el-dialog :title="isResend ? '重新发送学费邮件' : '发送学费邮件'" :visible.sync="emailDialogVisible" width="600px">
-      <el-form label-width="100px" v-if="currentEmailRow">
+      <el-form v-if="currentEmailRow" label-width="100px">
         <el-form-item label="invoice_no 号码">
           <span>{{ currentEmailRow.family_number || currentEmailRow.invoice_no }}</span>
         </el-form-item>
@@ -423,7 +423,7 @@
             multiple
             drag
           >
-            <i class="el-icon-upload"></i>
+            <i class="el-icon-upload" />
             <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
             <div slot="tip" class="el-upload__tip">支持PDF、Word、Excel、图片等格式，单文件不超过10MB</div>
           </el-upload>
@@ -894,56 +894,12 @@ export default {
       return allTuition
     },
 
-    // 获取所有学生（处理分页）
-    async getAllStudents() {
-      const allStudents = []
-      let page = 1
-      const pageSize = 100
-      let hasMore = true
-
-      try {
-        while (hasMore) {
-          const res = await this.$http.get('/students/', {
-            params: { page: page, page_size: pageSize }
-          })
-
-          let dataList = []
-          if (Array.isArray(res)) {
-            dataList = res
-            hasMore = false
-          } else if (res.results && Array.isArray(res.results)) {
-            dataList = res.results
-            hasMore = dataList.length === pageSize && (res.count > allStudents.length + dataList.length)
-          } else if (res.data && Array.isArray(res.data)) {
-            dataList = res.data
-            hasMore = false
-          }
-
-          allStudents.push(...dataList)
-
-          if (dataList.length < pageSize) {
-            hasMore = false
-          }
-          page++
-
-          // 安全限制
-          if (allStudents.length > 10000) {
-            break
-          }
-        }
-      } catch (error) {
-        console.error('获取学生列表失败:', error)
-      }
-
-      return allStudents
-    },
-
     // 获取学生选项（只显示没有学费信息的学生）
     async getStudentOptions() {
       try {
         // 获取所有学生列表（不过滤，允许为同一学生创建不同学年的学费信息）
         const studentsRes = await this.getAllStudents()
-        
+
         console.log('所有学生数量:', studentsRes.length)
         console.log('学生名单:', studentsRes.map(s => ({ id: s.id, name: s.english_name || s.last_name + s.first_name })))
 
@@ -1106,29 +1062,29 @@ export default {
     // 选择学生时自动填充信息
     handleStudentSelect(studentId) {
       if (!studentId) return
-      
+
       const student = this.studentOptions.find(item => item.id === studentId)
       if (student) {
         // 自动填充学号和学生姓名
         this.tuitionForm.student_no_xf = student.student_no || ''
         const fullName = `${student.last_name || ''} ${student.first_name || ''}`.trim()
         this.tuitionForm.student_name = fullName || student.english_name || ''
-        
+
         // 自动填充年级（如果有）
         if (student.class_name) {
           this.tuitionForm.grade = student.class_name
         }
-        
+
         // 自动填充出生日期
         if (student.dob) {
           this.tuitionForm.dob = student.dob
         }
-        
+
         // 自动填充入学日期
         if (student.enrollment_date) {
           this.tuitionForm.enrollment_date = student.enrollment_date
         }
-        
+
         // 自动填充家长邮箱
         if (student.parent1_email_address) {
           this.tuitionForm.parent1_email_address = student.parent1_email_address
@@ -1136,7 +1092,7 @@ export default {
         if (student.parent2_email_address) {
           this.tuitionForm.parent2_email_address = student.parent2_email_address
         }
-        
+
         this.$message.success(`已自动填充学生信息：${fullName}`)
       }
     },
@@ -1288,7 +1244,7 @@ export default {
         formData.append('action', 'send_single')
         formData.append('invoice_no', this.currentEmailRow.invoice_no)
         formData.append('academic_year', this.currentEmailRow.academic_year || '')
-        
+
         if (this.isResend) {
           formData.append('force_resend', 'true')
         }
@@ -1687,7 +1643,7 @@ export default {
         const totalRows = data.total_rows || 0
 
         // 构建成功信息
-        let successHtml = `
+        const successHtml = `
           <div style="text-align: center; margin-bottom: 20px;">
             <i class="el-icon-success" style="font-size: 48px; color: #67c23a;"></i>
             <div style="font-size: 16px; margin-top: 15px; color: #67c23a; font-weight: bold;">导入成功</div>

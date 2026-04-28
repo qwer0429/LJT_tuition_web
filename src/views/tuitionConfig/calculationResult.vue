@@ -45,12 +45,12 @@
       </div>
       <el-form :inline="true" class="demo-form-inline">
         <el-form-item label="家庭编号：">
-          <el-select 
-            v-model="selectedFamilyList" 
-            placeholder="请选择家庭（可多选）" 
-            clearable 
-            filterable 
-            multiple 
+          <el-select
+            v-model="selectedFamilyList"
+            placeholder="请选择家庭（可多选）"
+            clearable
+            filterable
+            multiple
             collapse-tags
             style="width: 320px;"
           >
@@ -272,7 +272,7 @@
     <!-- 制作结果（空状态） -->
     <el-card v-else class="result-container" shadow="never" style="margin-top: 15px;">
       <div style="text-align: center; padding: 40px 0; color: #909399;">
-        <i class="el-icon-s-claim" style="font-size: 48px; margin-bottom: 15px; display: block;"></i>
+        <i class="el-icon-s-claim" style="font-size: 48px; margin-bottom: 15px; display: block;" />
         <p style="font-size: 14px;">请先选择计算方式并点击"制作所有学费单"按钮</p>
       </div>
     </el-card>
@@ -280,16 +280,16 @@
     <!-- PDF预览对话框 -->
     <el-dialog title="学费通知单预览" :visible.sync="pdfDialogVisible" width="800px" @close="handlePdfDialogClose">
       <div v-if="pdfUrl" style="text-align: center;">
-        <iframe 
-          :src="pdfUrl" 
-          width="100%" 
-          height="600px" 
+        <iframe
+          :src="pdfUrl"
+          width="100%"
+          height="600px"
           style="border: none;"
           @load="handlePdfLoad"
-        ></iframe>
+        />
       </div>
       <div v-else style="text-align: center; padding: 50px;">
-        <i class="el-icon-loading" style="font-size: 24px;"></i>
+        <i class="el-icon-loading" style="font-size: 24px;" />
         <p>正在加载PDF...</p>
       </div>
     </el-dialog>
@@ -314,7 +314,7 @@
             multiple
             drag
           >
-            <i class="el-icon-upload"></i>
+            <i class="el-icon-upload" />
             <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
             <div slot="tip" class="el-upload__tip">支持PDF、Word、Excel、图片等格式，单文件不超过10MB</div>
           </el-upload>
@@ -343,7 +343,7 @@
             multiple
             drag
           >
-            <i class="el-icon-upload"></i>
+            <i class="el-icon-upload" />
             <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
             <div slot="tip" class="el-upload__tip">支持PDF、Word、Excel、图片等格式，单文件不超过10MB。所有附件将随每封邮件一起发送。</div>
           </el-upload>
@@ -379,7 +379,7 @@
             multiple
             drag
           >
-            <i class="el-icon-upload"></i>
+            <i class="el-icon-upload" />
             <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
             <div slot="tip" class="el-upload__tip">支持PDF、Word、Excel、图片等格式，单文件不超过10MB。所有附件将随每封邮件一起发送。</div>
           </el-upload>
@@ -747,14 +747,14 @@ export default {
     return {
       calcForm: {
         academic_year: '2026-2027',
-        semester_id: null,  // null 表示使用当前学期（启用的配置）
-        payment_type: 'yearly'  // 'yearly', 'semester'
+        semester_id: null, // null 表示使用当前学期（启用的配置）
+        payment_type: 'yearly' // 'yearly', 'semester'
       },
-      emailSubject: '',  // 邮件主题，由 getActiveCalculationConfig 动态初始化
-      selectedFamilyList: [],  // 多选家庭列表
+      emailSubject: '', // 邮件主题，由 getActiveCalculationConfig 动态初始化
+      selectedFamilyList: [], // 多选家庭列表
       familyOptions: [],
       semesterOptions: [],
-      currentSemesterConfig: null,  // 当前启用的学期配置
+      currentSemesterConfig: null, // 当前启用的学期配置
       calculationResult: null,
       activeNames: [0],
       pdfDialogVisible: false,
@@ -762,23 +762,23 @@ export default {
       downloadAllLoading: false,
       downloadSelectedLoading: false,
       calculateLoading: false,
-      selectedFamilies: [],  // 选中的家庭列表
-      isSelectAll: false,  // 是否全选
+      selectedFamilies: [], // 选中的家庭列表
+      isSelectAll: false, // 是否全选
       emailDialogVisible: false,
       batchEmailDialogVisible: false,
-      selectedBatchEmailDialogVisible: false,  // 发送选中对话框
+      selectedBatchEmailDialogVisible: false, // 发送选中对话框
       emailSending: false,
       batchEmailSending: false,
-      selectedBatchEmailSending: false,  // 发送选中加载状态
+      selectedBatchEmailSending: false, // 发送选中加载状态
       currentEmailFamily: null,
       emailAttachmentList: [],
       batchEmailAttachmentList: [],
-      selectedBatchEmailAttachmentList: [],  // 发送选中附件列表
-      emailStatusPolling: null,  // 邮件状态轮询定时器
-      emailSendingInvoiceNo: null,  // 当前正在查询发送状态的invoice_no
+      selectedBatchEmailAttachmentList: [], // 发送选中附件列表
+      emailStatusPolling: null, // 邮件状态轮询定时器
+      emailSendingInvoiceNo: null, // 当前正在查询发送状态的invoice_no
       manualPdfDialogVisible: false,
       manualPdfLoading: false,
-      studentTuitionOptions: [],  // 学费信息中的学生列表（用于手动PDF选择）
+      studentTuitionOptions: [], // 学费信息中的学生列表（用于手动PDF选择）
       manualPdfForm: {
         invoice_no: '',
         family_name: '',
@@ -802,7 +802,7 @@ export default {
           working_days: null,
           total_working_days: null,
           prorated_tuition: null,
-  
+
           sibling_discount_rate: 0,
           sibling_discount_amount: 0,
           company_discount_rate: 0,
@@ -834,6 +834,11 @@ export default {
     // 并行加载基础数据
     this.initPageData()
   },
+
+  beforeDestroy() {
+    // 组件销毁时清除邮件状态轮询定时器
+    this.stopEmailStatusPolling()
+  },
   methods: {
     // 获取实际的 payment_type（处理学期选择）
     getActualPaymentType() {
@@ -848,7 +853,7 @@ export default {
       }
       return this.calcForm.payment_type
     },
-    
+
     // 获取支付类型的显示文本
     getPaymentTypeLabel() {
       if (this.calcForm.payment_type === 'semester') {
@@ -861,27 +866,27 @@ export default {
       }
       return '学年'
     },
-    
+
     // 处理计算方式变化
     handlePaymentTypeChange(value) {
       // 切换时保持学期选择不变
     },
-    
+
     // 验证计算表单
     validateCalcForm() {
       if (!this.calcForm.payment_type) {
         this.$message.warning('请选择计算方式')
         return false
       }
-      
+
       if (!this.calcForm.semester_id) {
         this.$message.warning('请选择学期')
         return false
       }
-      
+
       return true
     },
-    
+
     // 构建计算请求参数
     buildCalcParams(extraParams = {}) {
       const params = {
@@ -889,29 +894,29 @@ export default {
         payment_type: this.getActualPaymentType(),
         ...extraParams
       }
-      
+
       // 使用选中的学期ID（默认是当前学期）
       if (this.calcForm.semester_id) {
         params.semester_id = this.calcForm.semester_id
       } else if (this.currentSemesterConfig) {
         params.semester_id = this.currentSemesterConfig.id
       }
-      
+
       return params
     },
-    
+
     // 初始化页面数据
     async initPageData() {
       console.log('开始加载学费计算页面数据...')
       const startTime = Date.now()
-      
+
       // 1. 先获取计算规则配置中的启用学年
       await this.getActiveCalculationConfig()
       // 2. 再加载学期选项
       await this.getSemesterOptions()
       // 3. 最后按启用学年加载家庭列表
       await this.getFamilyOptions()
-      
+
       const endTime = Date.now()
       console.log(`学费计算页面数据加载完成，耗时: ${endTime - startTime}ms`)
     },
@@ -942,21 +947,21 @@ export default {
         console.error('获取计算规则配置失败:', error)
       }
     },
-    
+
     // 刷新数据
     async refreshCache() {
       this.$message.info('正在刷新数据...')
       await this.initPageData()
       this.$message.success('数据已刷新')
     },
-    
+
     // 获取所有学费信息中的家庭编号（已废弃，保留方法避免引用错误）
     async getExistingFamilyNumbers() {
       // 不再从 studenttuitioninfo 获取数据进行去重
       // 直接返回空集合，不再过滤家庭列表
       return new Set()
     },
-    
+
     async getFamilyOptions() {
       try {
         const params = { type: 'families' }
@@ -965,13 +970,13 @@ export default {
           params.academic_year = this.calcForm.academic_year
         }
         const res = await this.$http.get('/tuition/calculate/', { params })
-        let allFamilies = res.data || []
+        const allFamilies = res.data || []
         console.log(`后端返回的 ${this.calcForm.academic_year || '全部'} 学年家庭:`, allFamilies)
-        
+
         // 直接使用后端返回的家庭列表（已去重并按学年过滤）
         this.familyOptions = allFamilies
         console.log('有效家庭数量:', allFamilies.length)
-        
+
         if (allFamilies.length === 0) {
           this.$message.warning(`学年 ${this.calcForm.academic_year} 没有可计算的家庭，请先在学生学费信息管理中维护家庭数据`)
         }
@@ -980,7 +985,7 @@ export default {
         this.familyOptions = []
       }
     },
-    
+
     async getSemesterOptions() {
       try {
         // 获取所有启用的学期
@@ -993,15 +998,15 @@ export default {
         } else if (res.data) {
           results = Array.isArray(res.data) ? res.data : [res.data]
         }
-        
+
         // 过滤：只显示与当前计算规则学年一致的学期
         if (this.calcForm.academic_year) {
           results = results.filter(item => item.academic_year === this.calcForm.academic_year)
           console.log(`学期已按学年过滤: ${this.calcForm.academic_year}, 剩余 ${results.length} 个学期`)
         }
-        
+
         this.semesterOptions = results
-        
+
         // 使用过滤后第一个启用的学期作为当前学期
         if (results.length > 0) {
           const activeConfig = results.find(item => item.is_active)
@@ -1026,22 +1031,22 @@ export default {
     },
     async handleCalculateAll() {
       if (!this.validateCalcForm()) return
-      
+
       this.calculateLoading = true
       try {
         const params = this.buildCalcParams({ action: 'calculate_all', save_record: true })
         console.log('计算所有家庭，参数:', params, '显示:', this.getPaymentTypeLabel())
-        
+
         const res = await this.$http.post('/tuition/calculate/', params)
         this.calculationResult = res.data
-        
+
         // 如果后端返回的学期不是当前学期，显示提示
-        if (this.calculationResult.semester && 
-            this.currentSemesterConfig && 
+        if (this.calculationResult.semester &&
+            this.currentSemesterConfig &&
             this.calculationResult.semester.id !== this.currentSemesterConfig.id) {
           this.$message.info('使用的是非当前学期的配置')
         }
-        
+
         const msg = res.message || '计算完成'
         this.$message.success(msg)
       } catch (error) {
@@ -1055,29 +1060,29 @@ export default {
         this.$message.warning('请选择家庭')
         return
       }
-      
+
       if (!this.validateCalcForm()) return
-      
+
       this.calculateLoading = true
       try {
         // 使用批量计算接口
-        const params = this.buildCalcParams({ 
+        const params = this.buildCalcParams({
           action: 'calculate_batch',
           invoice_nos: this.selectedFamilyList,
           save_record: true
         })
         console.log('批量制作学费单，参数:', params)
-        
+
         const res = await this.$http.post('/tuition/calculate/', params)
         console.log('批量制作响应:', res)
-        
+
         // 检查响应格式 (res 已经是 response.data)
         if (!res.data) {
           console.error('响应格式错误:', res)
           this.$message.error('响应格式错误')
           return
         }
-        
+
         // 构建与 calculate_all 兼容的数据结构
         this.calculationResult = {
           family_count: res.data.family_count || 0,
@@ -1086,24 +1091,24 @@ export default {
           payment_type: this.calcForm.payment_type,
           semester_config: this.currentSemesterConfig
         }
-        
+
         // 如果后端返回的学期配置不是当前学期，显示提示
         if (this.calculationResult.families && this.calculationResult.families.length > 0) {
           const firstFamilySemester = this.calculationResult.families[0].semester_config
-          if (firstFamilySemester && 
-              this.currentSemesterConfig && 
+          if (firstFamilySemester &&
+              this.currentSemesterConfig &&
               firstFamilySemester.id !== this.currentSemesterConfig.id) {
             this.$message.info('使用的是非当前学期的配置')
           }
         }
-        
+
         // 显示错误信息（如果有）
         if (res.data.errors && res.data.errors.length > 0) {
           const errorCount = res.data.errors.length
           this.$message.warning(`${errorCount} 个家庭制作失败，请检查家庭编号`)
           console.warn('制作失败的家庭:', res.data.errors)
         }
-        
+
         const msg = res.message || `成功制作 ${res.data.family_count} 个家庭的学费单`
         this.$message.success(msg)
       } catch (error) {
@@ -1477,7 +1482,7 @@ export default {
           working_days: null,
           total_working_days: null,
           prorated_tuition: null,
-  
+
           sibling_discount_rate: 0,
           sibling_discount_amount: 0,
           company_discount_rate: 0,
@@ -1507,10 +1512,10 @@ export default {
       let defaultEnd = ''
       let defaultWorkingDays = null
       let defaultTotalDays = null
-      
+
       // 学期支付时自动填充默认学期起止日期和到校日
       if (calcType === 'semester_1' || calcType === 'semester_2') {
-        const semester = this.semesterOptions.find(s => 
+        const semester = this.semesterOptions.find(s =>
           (calcType === 'semester_1' && s.semester === 'First') ||
           (calcType === 'semester_2' && s.semester === 'Second')
         )
@@ -1521,7 +1526,7 @@ export default {
           defaultTotalDays = semester.total_teaching_days || 0
         }
       }
-      
+
       this.manualPdfForm.students.push({
         _selectedTuitionId: null,
         english_name: '',
@@ -1653,16 +1658,16 @@ export default {
     async calculateCustomWorkingDays() {
       const calcType = this.manualPdfForm.calculation_type
       if (calcType !== 'semester_1' && calcType !== 'semester_2') return
-      
+
       // 获取当前学期配置
-      const semester = this.semesterOptions.find(s => 
+      const semester = this.semesterOptions.find(s =>
         (calcType === 'semester_1' && s.semester === 'First') ||
         (calcType === 'semester_2' && s.semester === 'Second')
       )
       const semesterStart = semester ? semester.start_date : ''
       const semesterEnd = semester ? semester.end_date : ''
       const semesterTotalDays = semester ? (semester.total_teaching_days || 0) : 0
-      
+
       if (!semesterStart || !semesterEnd) {
         this.$message.warning('未找到学期配置，请先选择学年')
         return
@@ -1675,24 +1680,24 @@ export default {
           // 使用学生自定义日期，默认使用学期日期
           const start = student.custom_start_date || semesterStart
           const end = student.custom_end_date || semesterEnd
-          
+
           const res = await this.$http.post('/tuition/calculate/', {
             action: 'calculate_tuition_period_days',
             tuition_period: `${start.replace(/-/g, '.')}-${end.replace(/-/g, '.')}`,
             academic_year: this.manualPdfForm.academic_year,
             registration_fee: student.registration_fee || 0
           })
-          
+
           // 兼容响应格式：res.code 或 res.data.code
           const responseCode = res.code !== undefined ? res.code : (res.data ? res.data.code : null)
           const responseData = res.data !== undefined ? (res.data.data || res.data) : res
-          
+
           if (responseCode === 1) {
             const data = responseData
             student.working_days = data.working_days || 0
             // 使用学期总教学日作为分母，确保比例计算准确
             student.total_working_days = semesterTotalDays || data.total_working_days || data.total_days || 0
-            
+
             // 按到校日比例折算基础学费
             const baseTuition = student.base_tuition || 0
             if (data.is_new_student && data.academic_year_days > 0) {
@@ -1717,7 +1722,7 @@ export default {
             }
           }
         }
-        
+
         // 更新全局校车费（根据每个学生的计算结果汇总）
         const defaultBusFee = calcType === 'semester_1' ? 5900 : 5100
         let totalBusFee = 0
@@ -1727,7 +1732,7 @@ export default {
           }
         })
         this.manualPdfForm.bus_fee = parseFloat(totalBusFee.toFixed(2))
-        
+
         this.$message.success('工作天数与校车费计算完成')
       } catch (error) {
         console.error('计算工作天数失败:', error)
@@ -1837,7 +1842,9 @@ export default {
     async handleGradeBlur(index, student) {
       const grade = student.grade ? student.grade.trim().toUpperCase() : ''
       if (!grade) return
-      
+
+      const targetStudent = student
+
       try {
         const res = await this.$http.get('/gradetuitionconfig/', {
           params: {
@@ -1846,7 +1853,7 @@ export default {
             is_active: true
           }
         })
-        
+
         let results = []
         if (Array.isArray(res)) {
           results = res
@@ -1855,7 +1862,7 @@ export default {
         } else if (res.data) {
           results = Array.isArray(res.data) ? res.data : []
         }
-        
+
         // 查找匹配的年级配置（优先精确匹配，其次前缀匹配）
         let matched = null
         for (const config of results) {
@@ -1869,11 +1876,11 @@ export default {
             break
           }
         }
-        
+
         if (matched) {
-          student.base_tuition = parseFloat(matched.base_tuition) || 165000
+          targetStudent.base_tuition = parseFloat(matched.base_tuition) || 165000
           if (matched.registration_fee !== undefined && matched.registration_fee !== null) {
-            student.registration_fee = parseFloat(matched.registration_fee)
+            targetStudent.registration_fee = parseFloat(matched.registration_fee)
           }
           this.$message.success(`已自动匹配年级「${matched.grade_name}」的学费配置`)
         }
@@ -2067,7 +2074,7 @@ export default {
           responseType: 'blob'
         })
 
-        const filename = `Tuition_PDFs_${academicYear}_${new Date().toISOString().slice(0,19).replace(/[-:T]/g,'')}.zip`
+        const filename = `Tuition_PDFs_${academicYear}_${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')}.zip`
         this.downloadBlob(new Blob([response.data], { type: 'application/zip' }), filename)
 
         this.$message.success('PDF批量下载完成')
@@ -2084,7 +2091,7 @@ export default {
     handleFamilySelect(family, index) {
       // 使用 Vue.set 确保响应式更新
       this.$set(this.calculationResult.families[index], 'isSelected', family.isSelected)
-      
+
       if (family.isSelected) {
         if (!this.selectedFamilies.find(f => f.invoice_no === family.invoice_no)) {
           this.selectedFamilies.push(family)
@@ -2182,7 +2189,7 @@ export default {
           totalFailed += failedCount
 
           const filename = this.getFilenameFromResponse(
-            response, 
+            response,
             `${defaultFilename}_${batchIndex + 1}_of_${totalBatches}.zip`
           )
 
@@ -2195,7 +2202,7 @@ export default {
           }
 
           batchIndex++
-          
+
           if (batchIndex < totalBatches) {
             await new Promise(resolve => setTimeout(resolve, 1000))
           }
@@ -2245,13 +2252,13 @@ export default {
 
       try {
         await this.$confirm(
-          `即将下载选中的 ${this.selectedFamilies.length} 个家庭的PDF文件，打包成zip格式。请稍候...`, 
-          '确认下载', 
+          `即将下载选中的 ${this.selectedFamilies.length} 个家庭的PDF文件，打包成zip格式。请稍候...`,
+          '确认下载',
           { confirmButtonText: '确认下载', cancelButtonText: '取消', type: 'info' }
         )
 
         const invoiceNos = this.selectedFamilies.map(f => f.invoice_no)
-        
+
         await this.batchDownloadPdfs(
           { invoice_nos: invoiceNos },
           {
@@ -2271,11 +2278,6 @@ export default {
         this.$message.error('下载失败：' + (error.message || '网络错误'))
       }
     }
-  },
-
-  beforeDestroy() {
-    // 组件销毁时清除邮件状态轮询定时器
-    this.stopEmailStatusPolling()
   }
 }
 </script>

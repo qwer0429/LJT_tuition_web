@@ -480,8 +480,8 @@
 </template>
 
 <script>
-import { 
-  getTuitionPaymentList, 
+import {
+  getTuitionPaymentList,
   getTuitionPaymentGrades,
   exportTuitionPayment
 } from '@/api/tuitionPayment'
@@ -624,7 +624,7 @@ export default {
           }
         })
         this.academicYearOptions = Array.from(years).sort((a, b) => b.localeCompare(a))
-        
+
         // 默认选中当前启用的计算规则学年
         if (!this.queryParams.academic_year) {
           const activeConfig = configs.find(c => c.is_active)
@@ -690,9 +690,9 @@ export default {
             delete params[key]
           }
         })
-        
+
         const res = await getTuitionPaymentList(params)
-        
+
         // 兼容多种返回格式：直接数组、DRF分页对象、包装对象
         if (Array.isArray(res)) {
           this.recordList = res.map(this.processRecord)
@@ -716,7 +716,6 @@ export default {
           this.recordList = []
           this.total = 0
         }
-        
       } catch (error) {
         console.error('加载记录列表失败:', error)
         this.$message.error('加载数据失败')
@@ -733,7 +732,7 @@ export default {
       const tuitionPaid = parseFloat(record.paid_tuition_fee) || 0
       const busPaid = parseFloat(record.paid_bus_fee) || 0
       const dormPaid = parseFloat(record.paid_dormitory_fee) || 0
-      
+
       return {
         ...record,
         total_payable: tuitionPayable + busFee + dormFee,
@@ -997,7 +996,7 @@ export default {
           params.grades = this.exportGrades.join(',')
         }
         const res = await exportTuitionPayment(params)
-        
+
         // 创建下载链接
         const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
         const link = document.createElement('a')
@@ -1014,7 +1013,7 @@ export default {
         link.click()
         document.body.removeChild(link)
         URL.revokeObjectURL(link.href)
-        
+
         this.exportDialogVisible = false
         this.$message.success('导出成功')
       } catch (error) {
