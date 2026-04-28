@@ -98,7 +98,7 @@
           </template>
         </el-table-column>
         <el-table-column label="年级" prop="grade" align="center" min-width="100" />
-        <el-table-column label="invoice_no 号码" prop="family_number" align="center" min-width="120" />
+        <el-table-column label="家庭编号" prop="family_number" align="center" min-width="120" />
         <el-table-column label="学年" prop="academic_year" align="center" width="100" />
         <el-table-column label="出生日期" align="center" width="110">
           <template slot-scope="scope">
@@ -240,7 +240,7 @@
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="原始家庭编号">
-              <el-input v-model="tuitionForm.family_number" placeholder="请输入原始家庭编号" />
+              <el-input v-model="tuitionForm.family_number" placeholder="请输入原始家庭编号" @input="handleFamilyNumberInput" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -469,7 +469,7 @@
             </span>
             <span v-else>-</span>
           </el-descriptions-item>
-          <el-descriptions-item label="校友兄弟姐妹折扣">
+          <el-descriptions-item label="校友折扣">
             <span v-if="detailData.alumni_discount_amount > 0" class="discount-text">
               -¥{{ detailData.alumni_discount_amount }} ({{ detailData.alumni_discount_rate }}%)
             </span>
@@ -1024,6 +1024,18 @@ export default {
       this.selectedRows = val
     },
 
+    // 输入原始家庭编号时实时自动生成 invoice_no
+    handleFamilyNumberInput(val) {
+      const familyNumber = String(val || '').trim()
+      const academicYear = this.tuitionForm.academic_year || this.listQuery.academic_year || this.getDefaultAcademicYear()
+      if (!familyNumber) {
+        this.tuitionForm.invoice_no = ''
+        return
+      }
+      const paddedNumber = familyNumber.padStart(4, '0')
+      this.tuitionForm.invoice_no = `XLIS ${academicYear} ${paddedNumber}`
+    },
+
     handleAdd() {
       this.isEdit = false
       this.editOriginData = null
@@ -1035,7 +1047,7 @@ export default {
         student_no_xf: '',
         invoice_no: '',
         family_number: '',
-        academic_year: '2025-2026',
+        academic_year: this.listQuery.academic_year || this.getDefaultAcademicYear(),
         grade: '',
 
         dob: null,

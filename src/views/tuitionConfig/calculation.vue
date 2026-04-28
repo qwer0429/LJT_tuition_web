@@ -19,6 +19,7 @@
         <el-col :span="8" style="text-align: right;">
           <el-button type="success" icon="el-icon-plus" @click="handleNewConfig">新建配置</el-button>
           <el-button type="primary" icon="el-icon-check" @click="handleSave">保存配置</el-button>
+          <el-button v-if="configId" type="danger" icon="el-icon-delete" @click="handleDelete">删除配置</el-button>
         </el-col>
       </el-row>
     </el-card>
@@ -66,7 +67,7 @@
         </el-row>
         <el-row :gutter="20">
           <el-col :span="8">
-            <el-form-item label="校友兄弟姐妹折扣(%)">
+            <el-form-item label="校友折扣(%)">
               <el-input-number v-model="configForm.alumni_discount_rate" :min="0" :max="100" :precision="2" style="width: 100%;" />
             </el-form-item>
           </el-col>
@@ -243,6 +244,29 @@ export default {
         semester_days: ''
       }
       this.$message.info('已创建新配置，请修改后保存')
+    },
+    
+    // 删除配置
+    async handleDelete() {
+      if (!this.configId) return
+      try {
+        await this.$confirm('确定要删除该配置吗？删除后不可恢复！', '确认删除', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        })
+        await this.$http.delete(`/tuitioncalculationconfig/${this.configId}/`)
+        this.$message.success('删除成功')
+        this.configId = null
+        this.selectedConfigId = null
+        this.handleNewConfig()
+        await this.getConfigList()
+      } catch (error) {
+        if (error !== 'cancel') {
+          console.error('删除失败:', error)
+          this.$message.error('删除失败: ' + (error.message || '网络错误'))
+        }
+      }
     },
     
     // 保存配置

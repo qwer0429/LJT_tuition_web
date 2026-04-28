@@ -44,7 +44,7 @@
         <span>选择家庭</span>
       </div>
       <el-form :inline="true" class="demo-form-inline">
-        <el-form-item label="家庭编号：">
+        <el-form-item label="invoice_no号码：">
           <el-select
             v-model="selectedFamilyList"
             placeholder="请选择家庭（可多选）"

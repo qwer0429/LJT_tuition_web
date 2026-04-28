@@ -10,7 +10,6 @@
         clearable
       />
       <el-button type="primary" icon="el-icon-search" @click="getList">查询</el-button>
-      <el-button type="success" icon="el-icon-plus" @click="handleCreate">新增校历</el-button>
       <el-button type="warning" icon="el-icon-upload" @click="handleImport">导入校历</el-button>
     </div>
 
@@ -115,7 +114,6 @@
           <el-select v-model="form.semester" placeholder="选择学期类型" style="width: 100%;">
             <el-option label="第一学期" value="First" />
             <el-option label="第二学期" value="Second" />
-            <el-option label="暑期学期" value="Summer" />
           </el-select>
         </el-form-item>
         <el-row :gutter="20">
@@ -143,7 +141,7 @@
           </el-col>
         </el-row>
         <el-form-item label="总到校日">
-          <el-input-number v-model="form.total_teaching_days" :min="0" :precision="0" style="width: 100%;" />
+          <el-input-number v-model="form.total_teaching_days" :min="0" :precision="0" style="width: 100%;" disabled />
         </el-form-item>
         <el-form-item label="启用状态">
           <el-switch v-model="form.is_active" active-text="启用" inactive-text="禁用" />
@@ -182,7 +180,6 @@
           <el-select v-model="importForm.semester_type" placeholder="选择学期" style="width: 100%;">
             <el-option label="第一学期" value="First" />
             <el-option label="第二学期" value="Second" />
-            <el-option label="暑期学期" value="Summer" />
           </el-select>
         </el-form-item>
         <el-row :gutter="20">
@@ -365,8 +362,7 @@ export default {
     formatSemesterType(type) {
       const typeMap = {
         'First': '第一学期',
-        'Second': '第二学期',
-        'Summer': '暑期学期'
+        'Second': '第二学期'
       }
       return typeMap[type] || type
     },
@@ -759,6 +755,7 @@ export default {
           formData.append('semester_type', this.importForm.semester_type)
           formData.append('start_date', this.importForm.start_date)
           formData.append('end_date', this.importForm.end_date)
+          formData.append('use_color', 'true')
 
           // 调用导入接口
           const res = await this.$http.post('/calendar-import/import-semester/', formData, {
