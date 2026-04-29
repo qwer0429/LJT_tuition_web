@@ -650,7 +650,7 @@ export default {
     // 加载所有家庭编号（用于下拉搜索，不受分页限制）
     async loadAllFamilies() {
       try {
-        const params = { type: 'families' }
+        const params = { type: 'record_families' }
         if (this.queryParams.academic_year) {
           params.academic_year = this.queryParams.academic_year
         }
