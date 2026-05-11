@@ -33,7 +33,8 @@
                 <el-button v-if="!multiSelectMode" type="text" icon="el-icon-check" @click="toggleMultiSelect(scope.row)">进入多选</el-button>
                 <template v-else>
                   <el-tag type="info" size="mini" style="margin-right: 10px;">已选 {{ selectedDayIds.size }} 天</el-tag>
-                  <el-button type="success" size="mini" icon="el-icon-check" @click="batchSetTeachingDay(scope.row)">批量到校</el-button>
+                  <el-button type="success" size="mini" icon="el-icon-check" @click="batchSetTeachingDay(scope.row, 1)">批量全天</el-button>
+                  <el-button type="primary" size="mini" icon="el-icon-circle-check" @click="batchSetTeachingDay(scope.row, 0.5)">批量半天</el-button>
                   <el-button type="warning" size="mini" icon="el-icon-close" @click="batchSetNonTeachingDay(scope.row)">批量休假</el-button>
                   <el-button type="text" icon="el-icon-close" @click="toggleMultiSelect(scope.row)">退出多选</el-button>
                 </template>
@@ -61,7 +62,8 @@
                   >
                     <template v-if="day">
                       <div class="day-number">{{ day.date.getDate() }}</div>
-                      <div v-if="day.is_teaching_day" class="day-tag teaching">到校</div>
+                      <div v-if="day.is_teaching_day == 0.5" class="day-tag half-teaching">半天</div>
+                      <div v-else-if="day.is_teaching_day > 0" class="day-tag teaching">到校</div>
                       <div v-else-if="day.is_weekend" class="day-tag weekend">休</div>
                       <div v-else class="day-tag non-teaching">假</div>
                     </template>
@@ -224,6 +226,21 @@
       </div>
     </el-dialog>
 
+    <!-- 单天教学日编辑对话框 -->
+    <el-dialog title="设置教学日" :visible.sync="dayEditDialogVisible" width="320px" center>
+      <div style="text-align: center; padding: 10px 0;">
+        <el-radio-group v-model="dayEditForm.weight" size="medium">
+          <el-radio-button :label="1">全天</el-radio-button>
+          <el-radio-button :label="0.5">半天</el-radio-button>
+          <el-radio-button :label="0">休假</el-radio-button>
+        </el-radio-group>
+      </div>
+      <div slot="footer" class="dialog-footer">
+        <el-button @click="dayEditDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitDayEdit">确定</el-button>
+      </div>
+    </el-dialog>
+
   </div>
 </template>
 
@@ -279,7 +296,15 @@ export default {
       academicYearOptions: [],
       // 多选模式
       multiSelectMode: false,
-      selectedDayIds: {}
+      selectedDayIds: {},
+      // 单天编辑
+      dayEditDialogVisible: false,
+      dayEditForm: {
+        dayId: null,
+        weight: 1,
+        semester: null,
+        day: null
+      }
     }
   },
   created() {
@@ -440,7 +465,9 @@ export default {
     getDayClass(day) {
       if (!day) return 'empty'
       const classes = []
-      if (day.is_teaching_day) {
+      if (day.is_teaching_day > 0 && day.is_teaching_day < 1) {
+        classes.push('half-teaching-day')
+      } else if (day.is_teaching_day > 0) {
         classes.push('teaching-day')
       } else if (day.is_weekend) {
         classes.push('weekend-day')
@@ -453,37 +480,32 @@ export default {
       return classes.join(' ')
     },
 
-    // 点击日期切换到校日状态
-    async handleDayClick(semester, day) {
-      // 周末不能修改
-      if (day.is_weekend) {
-        this.$message.info('周末不能修改为到校日')
-        return
+    // 点击日期打开编辑弹窗
+    handleDayClick(semester, day) {
+      this.dayEditForm = {
+        dayId: day.id,
+        weight: parseFloat(day.is_teaching_day) || 0,
+        semester: semester,
+        day: day
       }
+      this.dayEditDialogVisible = true
+    },
 
+    // 提交单天教学日权重修改
+    async submitDayEdit() {
+      const { dayId, weight, semester, day } = this.dayEditForm
       try {
-        const newStatus = !day.is_teaching_day
-        const actionText = newStatus ? '设为到校日' : '设为非到校日'
-
-        await this.$confirm(`确认将该日期${actionText}？`, '提示', {
-          confirmButtonText: '确定',
-          cancelButtonText: '取消',
-          type: 'warning'
-        })
-
-        // 调用API更新
-        const res = await this.$http.patch(`/schoolcalendar/${day.id}/`, {
-          is_teaching_day: newStatus
+        const res = await this.$http.patch(`/schoolcalendar/${dayId}/`, {
+          is_teaching_day: weight
         })
 
         // 更新本地数据
-        // eslint-disable-next-line require-atomic-updates
-        day.is_teaching_day = newStatus
+        day.is_teaching_day = weight
 
         // 更新原始 calendar_days 数据中的对应项
-        const calendarDay = semester.calendar_days.find(d => d.id === day.id)
+        const calendarDay = semester.calendar_days.find(d => d.id === dayId)
         if (calendarDay) {
-          calendarDay.is_teaching_day = newStatus
+          calendarDay.is_teaching_day = weight
         }
 
         // 使用后端返回的 semester_total_teaching_days 更新总到校日
@@ -494,12 +516,11 @@ export default {
           this.recalculateTeachingDays(semester)
         }
 
+        this.dayEditDialogVisible = false
         this.$message.success('更新成功')
       } catch (error) {
-        if (error !== 'cancel') {
-          console.error('更新失败:', error)
-          this.$message.error('更新失败')
-        }
+        console.error('更新失败:', error)
+        this.$message.error('更新失败')
       }
     },
 
@@ -522,15 +543,16 @@ export default {
       }
     },
 
-    // 批量设为到校日
-    async batchSetTeachingDay(semester) {
+    // 批量设为教学日（支持全天/半天）
+    async batchSetTeachingDay(semester, weight = 1) {
       const ids = Object.keys(this.selectedDayIds).map(Number)
       if (ids.length === 0) {
         this.$message.warning('请先选择日期')
         return
       }
+      const weightText = weight === 0.5 ? '半天' : '全天'
       try {
-        await this.$confirm(`确认将选中的 ${ids.length} 天设为到校日？`, '提示', {
+        await this.$confirm(`确认将选中的 ${ids.length} 天设为${weightText}？`, '提示', {
           confirmButtonText: '确定',
           cancelButtonText: '取消',
           type: 'warning'
@@ -538,13 +560,13 @@ export default {
         this.listLoading = true
         await this.$http.patch('/schoolcalendar/batch-update/', {
           ids: ids,
-          is_teaching_day: true
+          is_teaching_day: weight
         })
         // 更新本地数据
         ids.forEach(id => {
           const calendarDay = semester.calendar_days.find(d => d.id === id)
-          if (calendarDay && !calendarDay.is_weekend) {
-            calendarDay.is_teaching_day = true
+          if (calendarDay) {
+            calendarDay.is_teaching_day = weight
           }
         })
         this.recalculateTeachingDays(semester)
@@ -576,13 +598,13 @@ export default {
         this.listLoading = true
         await this.$http.patch('/schoolcalendar/batch-update/', {
           ids: ids,
-          is_teaching_day: false
+          is_teaching_day: 0
         })
         // 更新本地数据
         ids.forEach(id => {
           const calendarDay = semester.calendar_days.find(d => d.id === id)
           if (calendarDay) {
-            calendarDay.is_teaching_day = false
+            calendarDay.is_teaching_day = 0
           }
         })
         this.recalculateTeachingDays(semester)
@@ -612,7 +634,9 @@ export default {
     recalculateTeachingDays(semester) {
       if (!semester.calendar_days) return
 
-      const teachingDays = semester.calendar_days.filter(day => day.is_teaching_day).length
+      const teachingDays = semester.calendar_days.reduce((sum, day) => {
+        return sum + (parseFloat(day.is_teaching_day) || 0)
+      }, 0)
       semester.total_teaching_days = teachingDays
 
       // 强制更新列表中的学期数据
@@ -885,6 +909,19 @@ export default {
   }
   .day-tag.teaching {
     background-color: #67c23a;
+    color: #fff;
+  }
+}
+
+// 半天教学日样式 - 蓝色
+.half-teaching-day {
+  background-color: #ecf5ff;
+  border: 1px solid #a0cfff;
+  .day-number {
+    color: #409eff;
+  }
+  .day-tag.half-teaching {
+    background-color: #409eff;
     color: #fff;
   }
 }

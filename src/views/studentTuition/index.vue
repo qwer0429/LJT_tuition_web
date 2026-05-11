@@ -297,43 +297,43 @@
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="兄弟姐妹折扣">
-              <el-input-number v-model="tuitionForm.discount_sibling" :min="0" :precision="2" :controls="true" controls-position="right" style="width: 100%;" />
+              <el-input-number v-model="tuitionForm.discount_sibling" :min="0" :precision="2" :controls="true" controls-position="right" style="width: 100%;" placeholder="请输入兄弟姐妹折扣" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="公司折扣">
-              <el-input-number v-model="tuitionForm.discount_company" :min="0" :precision="2" :controls="true" controls-position="right" style="width: 100%;" />
+              <el-input-number v-model="tuitionForm.discount_company" :min="0" :precision="2" :controls="true" controls-position="right" style="width: 100%;" placeholder="请输入公司折扣" />
             </el-form-item>
           </el-col>
         </el-row>
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="校友折扣">
-              <el-input-number v-model="tuitionForm.discount_alumni" :min="0" :precision="2" :controls="true" controls-position="right" style="width: 100%;" />
+              <el-input-number v-model="tuitionForm.discount_alumni" :min="0" :precision="2" :controls="true" controls-position="right" style="width: 100%;" placeholder="请输入校友折扣" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="奖学金金额">
-              <el-input-number v-model="tuitionForm.scholarship_amount" :min="0" :precision="2" :controls="true" controls-position="right" style="width: 100%;" />
+              <el-input-number v-model="tuitionForm.scholarship_amount" :min="0" :precision="2" :controls="true" controls-position="right" style="width: 100%;" placeholder="请输入奖学金金额" />
             </el-form-item>
           </el-col>
         </el-row>
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="奖学金折扣(%)">
-              <el-input-number v-model="tuitionForm.scholarship_discount_rate" :min="0" :max="100" :precision="2" :controls="true" controls-position="right" style="width: 100%;" />
+              <el-input-number v-model="tuitionForm.scholarship_discount_rate" :min="0" :max="100" :precision="2" :controls="true" controls-position="right" style="width: 100%;" placeholder="请输入奖学金折扣" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="助学金">
-              <el-input-number v-model="tuitionForm.financial_aid" :min="0" :precision="2" :controls="true" controls-position="right" style="width: 100%;" />
+              <el-input-number v-model="tuitionForm.financial_aid" :min="0" :precision="2" :controls="true" controls-position="right" style="width: 100%;" placeholder="请输入助学金" />
             </el-form-item>
           </el-col>
         </el-row>
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="助学金折扣(%)">
-              <el-input-number v-model="tuitionForm.financial_aid_discount_rate" :min="0" :max="100" :precision="2" :controls="true" controls-position="right" style="width: 100%;" />
+              <el-input-number v-model="tuitionForm.financial_aid_discount_rate" :min="0" :max="100" :precision="2" :controls="true" controls-position="right" style="width: 100%;" placeholder="请输入助学金折扣" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -574,13 +574,13 @@ export default {
         academic_year: '',
         is_teacher_child: false,
         registration_fee: null,
-        discount_company: 0,
-        discount_alumni: 0,
-        discount_sibling: 0,
-        scholarship_amount: 0,
-        scholarship_discount_rate: 0,
-        financial_aid: 0,
-        financial_aid_discount_rate: 0
+        discount_company: undefined,
+        discount_alumni: undefined,
+        discount_sibling: undefined,
+        scholarship_amount: undefined,
+        scholarship_discount_rate: undefined,
+        financial_aid: undefined,
+        financial_aid_discount_rate: undefined
       },
       detailData: null,
       editOriginData: null, // 编辑时保存原始数据，用于对比变化
@@ -1057,13 +1057,13 @@ export default {
         registration_fee: null,
         needs_school_bus: true,
         is_teacher_child: false,
-        discount_sibling: 0,
-        discount_company: 0,
-        discount_alumni: 0,
-        scholarship_amount: 0,
-        scholarship_discount_rate: 0,
-        financial_aid: 0,
-        financial_aid_discount_rate: 0
+        discount_sibling: undefined,
+        discount_company: undefined,
+        discount_alumni: undefined,
+        scholarship_amount: undefined,
+        scholarship_discount_rate: undefined,
+        financial_aid: undefined,
+        financial_aid_discount_rate: undefined
       }
       this.dialogVisible = true
       this.$nextTick(() => {
@@ -1154,13 +1154,13 @@ export default {
         registration_fee: parseFloat(row.registration_fee) || null,
         needs_school_bus: row.needs_school_bus !== false,
         is_teacher_child: !!row.is_teacher_child,
-        discount_sibling: parseFloat(row.discount_sibling) || 0,
-        discount_company: parseFloat(row.discount_company) || 0,
-        discount_alumni: parseFloat(row.discount_alumni) || 0,
-        scholarship_amount: parseFloat(row.scholarship_amount) || 0,
-        scholarship_discount_rate: parseFloat(row.scholarship_discount_rate) || 0,
-        financial_aid: parseFloat(row.financial_aid) || 0,
-        financial_aid_discount_rate: parseFloat(row.financial_aid_discount_rate) || 0
+        discount_sibling: row.discount_sibling != null ? parseFloat(row.discount_sibling) : undefined,
+        discount_company: row.discount_company != null ? parseFloat(row.discount_company) : undefined,
+        discount_alumni: row.discount_alumni != null ? parseFloat(row.discount_alumni) : undefined,
+        scholarship_amount: row.scholarship_amount != null ? parseFloat(row.scholarship_amount) : undefined,
+        scholarship_discount_rate: row.scholarship_discount_rate != null ? parseFloat(row.scholarship_discount_rate) : undefined,
+        financial_aid: row.financial_aid != null ? parseFloat(row.financial_aid) : undefined,
+        financial_aid_discount_rate: row.financial_aid_discount_rate != null ? parseFloat(row.financial_aid_discount_rate) : undefined
       }
       this.dialogVisible = true
       this.$nextTick(() => {
@@ -1319,13 +1319,13 @@ export default {
               registration_fee: form.registration_fee ? parseFloat(form.registration_fee) : null,
               needs_school_bus: form.needs_school_bus,
               is_teacher_child: form.is_teacher_child,
-              discount_sibling: parseFloat(form.discount_sibling) || 0,
-              discount_company: parseFloat(form.discount_company) || 0,
-              discount_alumni: parseFloat(form.discount_alumni) || 0,
-              scholarship_amount: parseFloat(form.scholarship_amount) || 0,
-              scholarship_discount_rate: parseFloat(form.scholarship_discount_rate) || 0,
-              financial_aid: parseFloat(form.financial_aid) || 0,
-              financial_aid_discount_rate: parseFloat(form.financial_aid_discount_rate) || 0
+              discount_sibling: form.discount_sibling != null ? parseFloat(form.discount_sibling) : null,
+              discount_company: form.discount_company != null ? parseFloat(form.discount_company) : null,
+              discount_alumni: form.discount_alumni != null ? parseFloat(form.discount_alumni) : null,
+              scholarship_amount: form.scholarship_amount != null ? parseFloat(form.scholarship_amount) : null,
+              scholarship_discount_rate: form.scholarship_discount_rate != null ? parseFloat(form.scholarship_discount_rate) : null,
+              financial_aid: form.financial_aid != null ? parseFloat(form.financial_aid) : null,
+              financial_aid_discount_rate: form.financial_aid_discount_rate != null ? parseFloat(form.financial_aid_discount_rate) : null
             }
 
             let submitData
