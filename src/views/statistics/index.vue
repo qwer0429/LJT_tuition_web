@@ -279,14 +279,6 @@
             </el-form-item>
           </el-col>
         </el-row>
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="已付学费">
-              <el-input-number v-model="editForm.paid_tuition_fee" :min="0" :precision="2" :controls="false" style="width: 100%;" @change="calculateEditBalance" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-
         <!-- 校车费信息 -->
         <el-divider content-position="left">校车费信息</el-divider>
         <el-row :gutter="20">
@@ -307,18 +299,6 @@
           <el-col :span="12">
             <el-form-item label="校车费">
               <el-input-number v-model="editForm.school_bus_fee" :min="0" :precision="2" :controls="false" style="width: 100%;" @change="calculateEditBalance" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="已付校车费">
-              <el-input-number v-model="editForm.paid_bus_fee" :min="0" :precision="2" :controls="false" style="width: 100%;" @change="calculateEditBalance" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="凭证号(校车)">
-              <el-input v-model="editForm.bus_voucher_no" placeholder="请输入凭证号" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -346,86 +326,114 @@
             </el-form-item>
           </el-col>
         </el-row>
+
+        <!-- 付款明细 -->
+        <el-divider content-position="left">付款明细</el-divider>
+        <div v-for="(detail, index) in editForm.payment_details" :key="index" class="payment-detail-item" style="border: 1px solid #EBEEF5; border-radius: 4px; padding: 15px; margin-bottom: 15px; background: #FAFAFA;">
+          <el-row :gutter="20">
+            <el-col :span="8">
+              <el-form-item label="付款类型" :label-width="'90px'">
+                <el-select v-model="detail.payment_type" placeholder="请选择" style="width: 100%;" @change="calculateEditBalance">
+                  <el-option label="学费" value="tuition" />
+                  <el-option label="校车费" value="bus" />
+                  <el-option label="宿舍费" value="dormitory" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="付款金额" :label-width="'90px'">
+                <el-input-number v-model="detail.amount" :min="0" :precision="2" :controls="false" style="width: 100%;" placeholder="请输入金额" @change="calculateEditBalance" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="凭证号" :label-width="'90px'">
+                <el-input v-model="detail.voucher_no" placeholder="请输入凭证号" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="20">
+            <el-col :span="8">
+              <el-form-item label="付款日期" :label-width="'90px'">
+                <el-date-picker v-model="detail.paid_date" type="date" placeholder="选择日期" value-format="yyyy-MM-dd" style="width: 100%;" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="付款方" :label-width="'90px'">
+                <el-input v-model="detail.payer_name" placeholder="请输入付款方" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="卡号" :label-width="'90px'">
+                <el-input v-model="detail.card_no" placeholder="请输入卡号" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="20">
+            <el-col :span="8">
+              <el-form-item label="银行" :label-width="'90px'">
+                <el-input v-model="detail.bank_name" placeholder="请输入银行" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="发票号码" :label-width="'90px'">
+                <el-input v-model="detail.invoice_number" placeholder="请输入发票号码" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="开票金额" :label-width="'90px'">
+                <el-input-number v-model="detail.invoice_amount" :min="0" :precision="2" :controls="false" style="width: 100%;" placeholder="请输入开票金额" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="20">
+            <el-col :span="12">
+              <el-form-item label="发票内容" :label-width="'90px'">
+                <el-input v-model="detail.invoice_content" placeholder="请输入发票内容" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="备注" :label-width="'90px'">
+                <el-input v-model="detail.remark" placeholder="请输入备注" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <div style="text-align: right;">
+            <el-button type="danger" size="mini" icon="el-icon-delete" @click="removePaymentDetail(index)">删除</el-button>
+          </div>
+        </div>
+        <div style="margin-bottom: 20px;">
+          <el-button type="primary" size="small" icon="el-icon-plus" @click="addPaymentDetail">添加付款明细</el-button>
+          <span v-if="editForm.payment_details.length === 0" style="color: #909399; margin-left: 10px;">暂无付款明细</span>
+        </div>
+
+        <!-- 付款汇总 -->
+        <el-divider content-position="left">付款汇总</el-divider>
         <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="已付宿舍费">
-              <el-input-number v-model="editForm.paid_dormitory_fee" :min="0" :precision="2" :controls="false" style="width: 100%;" @change="calculateEditBalance" />
+          <el-col :span="8">
+            <el-form-item label="已付学费">
+              <div class="readonly-field">¥{{ formatMoney(editForm.paid_tuition_fee) }}</div>
             </el-form-item>
           </el-col>
-          <el-col :span="12">
-            <el-form-item label="凭证号(宿舍)">
-              <el-input v-model="editForm.dormitory_voucher_no" placeholder="请输入凭证号" />
+          <el-col :span="8">
+            <el-form-item label="已付校车费">
+              <div class="readonly-field">¥{{ formatMoney(editForm.paid_bus_fee) }}</div>
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="已付宿舍费">
+              <div class="readonly-field">¥{{ formatMoney(editForm.paid_dormitory_fee) }}</div>
             </el-form-item>
           </el-col>
         </el-row>
-
-        <!-- 付款与欠款 -->
-        <el-divider content-position="left">付款与欠款</el-divider>
         <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="付款日期">
-              <el-date-picker v-model="editForm.paid_date" type="date" placeholder="选择日期" value-format="yyyy-MM-dd" style="width: 100%;" />
-            </el-form-item>
-          </el-col>
           <el-col :span="12">
             <el-form-item label="欠款">
               <div class="readonly-field" :style="editForm.balance_due > 0 ? 'color: #F56C6C; font-weight: bold;' : ''">¥{{ formatMoney(editForm.balance_due) }}</div>
             </el-form-item>
           </el-col>
-        </el-row>
-        <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="实付金额">
               <div class="readonly-field highlight">¥{{ formatMoney(editForm.actual_paid_amount) }}</div>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="付款方">
-              <el-input v-model="editForm.payer_name" placeholder="请输入付款方" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="卡号">
-              <el-input v-model="editForm.card_no" placeholder="请输入卡号" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="银行">
-              <el-input v-model="editForm.bank_name" placeholder="请输入银行" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-
-        <!-- 发票信息 -->
-        <el-divider content-position="left">发票信息</el-divider>
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="发票号码">
-              <el-input v-model="editForm.invoice_number" placeholder="请输入发票号码" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="开票金额">
-              <el-input-number v-model="editForm.invoice_amount" :min="0" :precision="2" :controls="false" style="width: 100%;" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="发票内容">
-              <el-input v-model="editForm.invoice_content" placeholder="请输入发票内容" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-
-        <!-- 凭证号(学费) -->
-        <el-divider content-position="left">凭证信息</el-divider>
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="凭证号(学费)">
-              <el-input v-model="editForm.tuition_voucher_no" placeholder="请输入凭证号" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -551,7 +559,8 @@ export default {
         invoice_amount: 0,
         invoice_content: '',
         samsung_special_remark: '',
-        remark: ''
+        remark: '',
+        payment_details: []
       }
     }
   },
@@ -838,24 +847,77 @@ export default {
         invoice_content: row.invoice_content || '',
         samsung_special_remark: row.samsung_special_remark || '',
         remark: row.remark || '',
-        tuition_pdf_url: row.tuition_pdf_url || ''
+        tuition_pdf_url: row.tuition_pdf_url || '',
+        payment_details: (row.payment_details || []).map(d => ({
+          id: d.id,
+          payment_type: d.payment_type || 'tuition',
+          amount: numeric(d.amount),
+          voucher_no: d.voucher_no || '',
+          paid_date: d.paid_date || '',
+          payer_name: d.payer_name || '',
+          card_no: d.card_no || '',
+          bank_name: d.bank_name || '',
+          invoice_number: d.invoice_number || '',
+          invoice_amount: numeric(d.invoice_amount),
+          invoice_content: d.invoice_content || '',
+          remark: d.remark || ''
+        }))
       }
+      this.calculateEditBalance()
       this.editDialogVisible = true
       this.$nextTick(() => {
         this.$refs.editForm && this.$refs.editForm.clearValidate()
       })
     },
 
-    // 计算编辑表单中的欠款
+    // 添加付款明细
+    addPaymentDetail() {
+      this.editForm.payment_details.push({
+        payment_type: 'tuition',
+        amount: undefined,
+        voucher_no: '',
+        paid_date: '',
+        payer_name: '',
+        card_no: '',
+        bank_name: '',
+        invoice_number: '',
+        invoice_amount: undefined,
+        invoice_content: '',
+        remark: ''
+      })
+      this.calculateEditBalance()
+    },
+
+    // 删除付款明细
+    removePaymentDetail(index) {
+      this.editForm.payment_details.splice(index, 1)
+      this.calculateEditBalance()
+    },
+
+    // 计算编辑表单中的欠款（从付款明细汇总）
     calculateEditBalance() {
       const tuition = parseFloat(this.editForm.tuition_payable) || 0
       const bus = parseFloat(this.editForm.school_bus_fee) || 0
       const dorm = parseFloat(this.editForm.dormitory_fee) || 0
-      const paidTuition = parseFloat(this.editForm.paid_tuition_fee) || 0
-      const paidBus = parseFloat(this.editForm.paid_bus_fee) || 0
-      const paidDorm = parseFloat(this.editForm.paid_dormitory_fee) || 0
-      this.editForm.balance_due = (tuition + bus + dorm - paidTuition - paidBus - paidDorm).toFixed(2)
-      this.editForm.actual_paid_amount = (paidTuition + paidBus + paidDorm).toFixed(2)
+
+      let paidTuition = 0
+      let paidBus = 0
+      let paidDorm = 0
+      ;(this.editForm.payment_details || []).forEach(d => {
+        const amt = parseFloat(d.amount) || 0
+        if (d.payment_type === 'tuition') paidTuition += amt
+        else if (d.payment_type === 'bus') paidBus += amt
+        else if (d.payment_type === 'dormitory') paidDorm += amt
+      })
+
+      // 同步到主表字段（用于兼容列表展示）
+      this.editForm.paid_tuition_fee = paidTuition.toFixed(2)
+      this.editForm.paid_bus_fee = paidBus.toFixed(2)
+      this.editForm.paid_dormitory_fee = paidDorm.toFixed(2)
+
+      const totalPaid = paidTuition + paidBus + paidDorm
+      this.editForm.balance_due = (tuition + bus + dorm - totalPaid).toFixed(2)
+      this.editForm.actual_paid_amount = totalPaid.toFixed(2)
     },
 
     // 解析期间字符串为日期数组，格式：2026.8.17-2026.6.18
@@ -910,6 +972,27 @@ export default {
     async submitEdit() {
       this.editLoading = true
       try {
+        // 构造付款明细数据（剔除空值字段，保留 id 用于更新已有记录）
+        const paymentDetails = (this.editForm.payment_details || []).map(d => {
+          const item = {
+            payment_type: d.payment_type || 'tuition',
+            amount: d.amount != null ? parseFloat(d.amount) : 0,
+            voucher_no: d.voucher_no || null,
+            paid_date: d.paid_date || null,
+            payer_name: d.payer_name || null,
+            card_no: d.card_no || null,
+            bank_name: d.bank_name || null,
+            invoice_number: d.invoice_number || null,
+            invoice_amount: d.invoice_amount != null ? parseFloat(d.invoice_amount) : null,
+            invoice_content: d.invoice_content || null,
+            remark: d.remark || null
+          }
+          if (d.id) {
+            item.id = d.id
+          }
+          return item
+        })
+
         const payload = {
           seq_no: this.editForm.seq_no || null,
           student_no: this.editForm.student_no || null,
@@ -928,14 +1011,9 @@ export default {
           dormitory_period: this.editForm.dormitory_period || null,
           dormitory_fee: this.editForm.dormitory_fee || 0,
           tuition_voucher_no: this.editForm.tuition_voucher_no || null,
-          paid_tuition_fee: this.editForm.paid_tuition_fee || 0,
           bus_voucher_no: this.editForm.bus_voucher_no || null,
-          paid_bus_fee: this.editForm.paid_bus_fee || 0,
           dormitory_voucher_no: this.editForm.dormitory_voucher_no || null,
-          paid_dormitory_fee: this.editForm.paid_dormitory_fee || 0,
           paid_date: this.editForm.paid_date || null,
-          balance_due: this.editForm.balance_due || 0,
-          actual_paid_amount: this.editForm.actual_paid_amount || 0,
           payer_name: this.editForm.payer_name || null,
           card_no: this.editForm.card_no || null,
           bank_name: this.editForm.bank_name || null,
@@ -943,7 +1021,8 @@ export default {
           invoice_amount: this.editForm.invoice_amount || 0,
           invoice_content: this.editForm.invoice_content || null,
           samsung_special_remark: this.editForm.samsung_special_remark || null,
-          remark: this.editForm.remark || null
+          remark: this.editForm.remark || null,
+          payment_details: paymentDetails
         }
         await this.$http.put(`/tuition-payment/${this.editForm.id}/`, payload)
         this.$message.success('更新成功')
