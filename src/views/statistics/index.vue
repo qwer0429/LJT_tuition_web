@@ -118,10 +118,6 @@
         <el-table-column label="学费" align="right" min-width="120">
           <template slot-scope="scope">
             <div>应付: ¥{{ formatMoney(scope.row.tuition_payable) }}</div>
-            <div>已付: ¥{{ formatMoney(scope.row.paid_tuition_fee) }}</div>
-            <div v-if="(scope.row.tuition_payable - scope.row.paid_tuition_fee) > 0" style="color: #F56C6C; font-size: 12px;">
-              欠: ¥{{ formatMoney(scope.row.tuition_payable - scope.row.paid_tuition_fee) }}
-            </div>
           </template>
         </el-table-column>
         <el-table-column label="校车费" align="right" width="100">
@@ -152,20 +148,16 @@
         </el-table-column>
         <el-table-column label="欠款" align="right" width="120">
           <template slot-scope="scope">
-            <span :style="scope.row.balance_due > 0 ? 'color: #F56C6C; font-weight: bold;' : ''">
-              ¥{{ formatMoney(scope.row.balance_due) }}
+            <span :style="((scope.row.total_payable || 0) - (scope.row.total_paid || 0)) > 0 ? 'color: #F56C6C; font-weight: bold;' : ''">
+              ¥{{ formatMoney((scope.row.total_payable || 0) - (scope.row.total_paid || 0)) }}
             </span>
           </template>
         </el-table-column>
-        <el-table-column prop="paid_date" label="付款日期" align="center" width="100">
+
+        <el-table-column label="操作" align="center" width="220" fixed="right">
           <template slot-scope="scope">
-            {{ scope.row.paid_date || '-' }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="payer_name" label="付款方" align="center" min-width="120" />
-        <el-table-column label="操作" align="center" width="160" fixed="right">
-          <template slot-scope="scope">
-            <el-button type="text" size="small" @click="handleEdit(scope.row)">查看详情</el-button>
+            <el-button type="text" size="small" @click="handleViewPaymentDetails(scope.row)">查看付款明细</el-button>
+            <el-button type="text" size="small" @click="handleEdit(scope.row)">编辑</el-button>
             <el-button type="text" size="small" style="color: #f56c6c;" @click="handleDelete(scope.row)">删除</el-button>
           </template>
         </el-table-column>
@@ -329,7 +321,7 @@
 
         <!-- 付款明细 -->
         <el-divider content-position="left">付款明细</el-divider>
-        <div v-for="(detail, index) in editForm.payment_details" :key="index" class="payment-detail-item" style="border: 1px solid #EBEEF5; border-radius: 4px; padding: 15px; margin-bottom: 15px; background: #FAFAFA;">
+        <div v-for="(detail, index) in editForm.payment_details" :key="detail.id || ('new-' + index)" class="payment-detail-item" style="border: 1px solid #EBEEF5; border-radius: 4px; padding: 15px; margin-bottom: 15px; background: #FAFAFA;">
           <el-row :gutter="20">
             <el-col :span="8">
               <el-form-item label="付款类型" :label-width="'90px'">
@@ -459,6 +451,32 @@
       </div>
     </el-dialog>
 
+    <!-- 查看付款明细对话框 -->
+    <el-dialog :title="`${currentPaymentDetailStudent} - 付款明细`" :visible.sync="paymentDetailDialogVisible" width="800px">
+      <el-table :data="currentPaymentDetails" border size="small" style="width: 100%;">
+        <el-table-column prop="payment_type" label="付款类型" align="center" width="100">
+          <template slot-scope="scope">
+            <el-tag v-if="scope.row.payment_type === 'tuition'" type="primary" size="mini">学费</el-tag>
+            <el-tag v-else-if="scope.row.payment_type === 'bus'" type="success" size="mini">校车费</el-tag>
+            <el-tag v-else-if="scope.row.payment_type === 'dormitory'" type="warning" size="mini">宿舍费</el-tag>
+            <span v-else>{{ scope.row.payment_type }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="amount" label="付款金额" align="right" width="120">
+          <template slot-scope="scope">¥{{ formatMoney(scope.row.amount) }}</template>
+        </el-table-column>
+        <el-table-column prop="voucher_no" label="凭证号" align="center" min-width="120" />
+        <el-table-column prop="paid_date" label="付款日期" align="center" width="110" />
+        <el-table-column prop="payer_name" label="付款方" align="center" min-width="100" />
+        <el-table-column prop="invoice_number" label="发票号码" align="center" min-width="120" />
+        <el-table-column prop="remark" label="备注" align="center" min-width="120" show-overflow-tooltip />
+      </el-table>
+      <div v-if="currentPaymentDetails.length === 0" style="text-align: center; color: #909399; padding: 20px;">暂无付款明细</div>
+      <div slot="footer" class="dialog-footer">
+        <el-button @click="paymentDetailDialogVisible = false">关闭</el-button>
+      </div>
+    </el-dialog>
+
     <!-- 导出对话框 -->
     <el-dialog title="导出学费统计" :visible.sync="exportDialogVisible" width="450px">
       <el-form label-width="100px">
@@ -522,6 +540,9 @@ export default {
       exportDialogVisible: false,
       exportAcademicYear: '',
       exportGrades: [],
+      paymentDetailDialogVisible: false,
+      currentPaymentDetails: [],
+      currentPaymentDetailStudent: '',
       editForm: {
         id: null,
         seq_no: null,
@@ -733,20 +754,9 @@ export default {
       }
     },
 
-    // 处理记录数据，添加计算字段
+    // 处理记录数据，后端已返回 total_payable / total_paid
     processRecord(record) {
-      const tuitionPayable = parseFloat(record.tuition_payable) || 0
-      const busFee = parseFloat(record.school_bus_fee) || 0
-      const dormFee = parseFloat(record.dormitory_fee) || 0
-      const tuitionPaid = parseFloat(record.paid_tuition_fee) || 0
-      const busPaid = parseFloat(record.paid_bus_fee) || 0
-      const dormPaid = parseFloat(record.paid_dormitory_fee) || 0
-
-      return {
-        ...record,
-        total_payable: tuitionPayable + busFee + dormFee,
-        total_paid: tuitionPaid + busPaid + dormPaid
-      }
+      return record
     },
 
     // 学年变化处理
@@ -807,91 +817,103 @@ export default {
     },
 
     // 打开编辑对话框
-    handleEdit(row) {
+    async handleEdit(row) {
       const numeric = (val) => parseFloat(val) || 0
-      this.editForm = {
-        id: row.id,
-        seq_no: row.seq_no || null,
-        student_no: row.student_no || '',
-        student_name: row.student_name || '',
-        invoice_no: row.invoice_no || '',
-        tuition_period: row.tuition_period || '',
-        tuitionPeriodRange: this.parsePeriodString(row.tuition_period),
-        tuition_days: numeric(row.tuition_days),
-        grade: row.grade || '',
-        base_tuition: numeric(row.base_tuition),
-        registration_fee: numeric(row.registration_fee),
-        family_discount: numeric(row.family_discount),
-        other_discount: numeric(row.other_discount),
-        tuition_payable: numeric(row.tuition_payable),
-        bus_fee_period: row.bus_fee_period || '',
-        busFeePeriodRange: this.parsePeriodString(row.bus_fee_period),
-        school_bus_fee: numeric(row.school_bus_fee),
-        dormitory_period: row.dormitory_period || '',
-        dormitoryPeriodRange: this.parsePeriodString(row.dormitory_period),
-        dormitory_fee: numeric(row.dormitory_fee),
-        tuition_voucher_no: row.tuition_voucher_no || '',
-        paid_tuition_fee: numeric(row.paid_tuition_fee),
-        bus_voucher_no: row.bus_voucher_no || '',
-        paid_bus_fee: numeric(row.paid_bus_fee),
-        dormitory_voucher_no: row.dormitory_voucher_no || '',
-        paid_dormitory_fee: numeric(row.paid_dormitory_fee),
-        paid_date: row.paid_date || '',
-        balance_due: numeric(row.balance_due),
-        actual_paid_amount: numeric(row.actual_paid_amount),
-        payer_name: row.payer_name || '',
-        card_no: row.card_no || '',
-        bank_name: row.bank_name || '',
-        invoice_number: row.invoice_number || '',
-        invoice_amount: numeric(row.invoice_amount),
-        invoice_content: row.invoice_content || '',
-        samsung_special_remark: row.samsung_special_remark || '',
-        remark: row.remark || '',
-        tuition_pdf_url: row.tuition_pdf_url || '',
-        payment_details: (row.payment_details || []).map(d => ({
-          id: d.id,
-          payment_type: d.payment_type || 'tuition',
-          amount: numeric(d.amount),
-          voucher_no: d.voucher_no || '',
-          paid_date: d.paid_date || '',
-          payer_name: d.payer_name || '',
-          card_no: d.card_no || '',
-          bank_name: d.bank_name || '',
-          invoice_number: d.invoice_number || '',
-          invoice_amount: numeric(d.invoice_amount),
-          invoice_content: d.invoice_content || '',
-          remark: d.remark || ''
-        }))
+      try {
+        // 先获取完整详情（列表页不返回 payment_details）
+        const res = await this.$http.get(`/tuition-payment/${row.id}/`)
+        const detail = res.data || res
+
+        this.editForm = {
+          id: detail.id,
+          seq_no: detail.seq_no || null,
+          student_no: detail.student_no || '',
+          student_name: detail.student_name || '',
+          invoice_no: detail.invoice_no || '',
+          tuition_period: detail.tuition_period || '',
+          tuitionPeriodRange: this.parsePeriodString(detail.tuition_period),
+          tuition_days: numeric(detail.tuition_days),
+          grade: detail.grade || '',
+          base_tuition: numeric(detail.base_tuition),
+          registration_fee: numeric(detail.registration_fee),
+          family_discount: numeric(detail.family_discount),
+          other_discount: numeric(detail.other_discount),
+          tuition_payable: numeric(detail.tuition_payable),
+          bus_fee_period: detail.bus_fee_period || '',
+          busFeePeriodRange: this.parsePeriodString(detail.bus_fee_period),
+          school_bus_fee: numeric(detail.school_bus_fee),
+          dormitory_period: detail.dormitory_period || '',
+          dormitoryPeriodRange: this.parsePeriodString(detail.dormitory_period),
+          dormitory_fee: numeric(detail.dormitory_fee),
+          // 已删除字段不再从后端读取，由 calculateEditBalance 本地计算汇总
+          samsung_special_remark: detail.samsung_special_remark || '',
+          remark: detail.remark || '',
+          tuition_pdf_url: detail.tuition_pdf_url || '',
+          payment_details: (detail.payment_details || []).map(d => ({
+            id: d.id,
+            payment_type: d.payment_type || 'tuition',
+            amount: numeric(d.amount),
+            voucher_no: d.voucher_no || '',
+            paid_date: d.paid_date || '',
+            payer_name: d.payer_name || '',
+            card_no: d.card_no || '',
+            bank_name: d.bank_name || '',
+            invoice_number: d.invoice_number || '',
+            invoice_amount: numeric(d.invoice_amount),
+            invoice_content: d.invoice_content || '',
+            remark: d.remark || ''
+          }))
+        }
+        this.calculateEditBalance()
+        this.editDialogVisible = true
+        this.$nextTick(() => {
+          this.$refs.editForm && this.$refs.editForm.clearValidate()
+        })
+      } catch (error) {
+        console.error('获取详情失败:', error)
+        this.$message.error('获取详情失败')
       }
-      this.calculateEditBalance()
-      this.editDialogVisible = true
-      this.$nextTick(() => {
-        this.$refs.editForm && this.$refs.editForm.clearValidate()
-      })
     },
 
-    // 添加付款明细
+    // 添加付款明细（使用新数组触发响应式更新）
     addPaymentDetail() {
-      this.editForm.payment_details.push({
-        payment_type: 'tuition',
-        amount: undefined,
-        voucher_no: '',
-        paid_date: '',
-        payer_name: '',
-        card_no: '',
-        bank_name: '',
-        invoice_number: '',
-        invoice_amount: undefined,
-        invoice_content: '',
-        remark: ''
-      })
+      this.editForm.payment_details = [
+        ...this.editForm.payment_details,
+        {
+          payment_type: 'tuition',
+          amount: undefined,
+          voucher_no: '',
+          paid_date: '',
+          payer_name: '',
+          card_no: '',
+          bank_name: '',
+          invoice_number: '',
+          invoice_amount: undefined,
+          invoice_content: '',
+          remark: ''
+        }
+      ]
       this.calculateEditBalance()
     },
 
     // 删除付款明细
     removePaymentDetail(index) {
-      this.editForm.payment_details.splice(index, 1)
+      this.editForm.payment_details = this.editForm.payment_details.filter((_, i) => i !== index)
       this.calculateEditBalance()
+    },
+
+    // 查看付款明细
+    async handleViewPaymentDetails(row) {
+      try {
+        const res = await this.$http.get(`/tuition-payment/${row.id}/`)
+        const data = res.data || res
+        this.currentPaymentDetails = data.payment_details || []
+        this.currentPaymentDetailStudent = data.student_name || data.student_no || '未知学生'
+        this.paymentDetailDialogVisible = true
+      } catch (error) {
+        console.error('获取付款明细失败:', error)
+        this.$message.error('获取付款明细失败')
+      }
     },
 
     // 计算编辑表单中的欠款（从付款明细汇总）
@@ -976,7 +998,7 @@ export default {
         const paymentDetails = (this.editForm.payment_details || []).map(d => {
           const item = {
             payment_type: d.payment_type || 'tuition',
-            amount: d.amount != null ? parseFloat(d.amount) : 0,
+            amount: d.amount != null && d.amount !== '' && !isNaN(d.amount) ? parseFloat(d.amount) : 0,
             voucher_no: d.voucher_no || null,
             paid_date: d.paid_date || null,
             payer_name: d.payer_name || null,
@@ -1010,16 +1032,7 @@ export default {
           school_bus_fee: this.editForm.school_bus_fee || 0,
           dormitory_period: this.editForm.dormitory_period || null,
           dormitory_fee: this.editForm.dormitory_fee || 0,
-          tuition_voucher_no: this.editForm.tuition_voucher_no || null,
-          bus_voucher_no: this.editForm.bus_voucher_no || null,
-          dormitory_voucher_no: this.editForm.dormitory_voucher_no || null,
-          paid_date: this.editForm.paid_date || null,
-          payer_name: this.editForm.payer_name || null,
-          card_no: this.editForm.card_no || null,
-          bank_name: this.editForm.bank_name || null,
-          invoice_number: this.editForm.invoice_number || null,
-          invoice_amount: this.editForm.invoice_amount || 0,
-          invoice_content: this.editForm.invoice_content || null,
+          // 主表已删除字段不再提交，付款明细已包含相关信息
           samsung_special_remark: this.editForm.samsung_special_remark || null,
           remark: this.editForm.remark || null,
           payment_details: paymentDetails
