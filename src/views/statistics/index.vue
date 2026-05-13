@@ -76,6 +76,40 @@
       </div>
     </el-card>
 
+    <!-- 统计卡片 -->
+    <el-row :gutter="15" style="margin-top: 15px;">
+      <el-col :span="4">
+        <el-card shadow="hover" :body-style="{ padding: '15px' }">
+          <div style="color: #909399; font-size: 13px;">总记录数</div>
+          <div style="font-size: 24px; font-weight: bold; color: #303133; margin-top: 8px;">{{ statisticsData.record_count }}</div>
+        </el-card>
+      </el-col>
+      <el-col :span="4">
+        <el-card shadow="hover" :body-style="{ padding: '15px' }">
+          <div style="color: #909399; font-size: 13px;">学生人数（去重）</div>
+          <div style="font-size: 24px; font-weight: bold; color: #409EFF; margin-top: 8px;">{{ statisticsData.student_count }}</div>
+        </el-card>
+      </el-col>
+      <el-col :span="5">
+        <el-card shadow="hover" :body-style="{ padding: '15px' }">
+          <div style="color: #909399; font-size: 13px;">应付总额</div>
+          <div style="font-size: 20px; font-weight: bold; color: #303133; margin-top: 8px;">¥{{ formatMoney(statisticsData.total_payable) }}</div>
+        </el-card>
+      </el-col>
+      <el-col :span="5">
+        <el-card shadow="hover" :body-style="{ padding: '15px' }">
+          <div style="color: #909399; font-size: 13px;">已付总额</div>
+          <div style="font-size: 20px; font-weight: bold; color: #67C23A; margin-top: 8px;">¥{{ formatMoney(statisticsData.total_paid) }}</div>
+        </el-card>
+      </el-col>
+      <el-col :span="6">
+        <el-card shadow="hover" :body-style="{ padding: '15px' }">
+          <div style="color: #909399; font-size: 13px;">欠款总额</div>
+          <div style="font-size: 20px; font-weight: bold; color: #F56C6C; margin-top: 8px;">¥{{ formatMoney(statisticsData.total_balance) }}</div>
+        </el-card>
+      </el-col>
+    </el-row>
+
     <!-- 数据表格 -->
     <el-card class="table-container" shadow="never" style="margin-top: 15px;">
       <el-table
@@ -115,23 +149,32 @@
             <div v-else>-</div>
           </template>
         </el-table-column>
-        <el-table-column label="学费" align="right" min-width="120">
+        <el-table-column label="学费" align="right" header-align="center" min-width="130">
           <template slot-scope="scope">
             <div>应付: ¥{{ formatMoney(scope.row.tuition_payable) }}</div>
+            <div v-if="Number(scope.row.paid_tuition_detail) > 0" style="color: #67C23A; font-size: 12px;">
+              已付: ¥{{ formatMoney(scope.row.paid_tuition_detail) }}
+            </div>
           </template>
         </el-table-column>
-        <el-table-column label="校车费" align="right" width="100">
+        <el-table-column label="校车费" align="right" header-align="center" width="120">
           <template slot-scope="scope">
-            <div v-if="scope.row.school_bus_fee > 0">
-              ¥{{ formatMoney(scope.row.school_bus_fee) }}
+            <div v-if="Number(scope.row.school_bus_fee) > 0">
+              <div>应付: ¥{{ formatMoney(scope.row.school_bus_fee) }}</div>
+              <div v-if="Number(scope.row.paid_bus_detail) > 0" style="color: #67C23A; font-size: 12px;">
+                已付: ¥{{ formatMoney(scope.row.paid_bus_detail) }}
+              </div>
             </div>
             <div v-else>-</div>
           </template>
         </el-table-column>
-        <el-table-column label="宿舍费" align="right" width="100">
+        <el-table-column label="宿舍费" align="right" header-align="center" width="120">
           <template slot-scope="scope">
-            <div v-if="scope.row.dormitory_fee > 0">
-              ¥{{ formatMoney(scope.row.dormitory_fee) }}
+            <div v-if="Number(scope.row.dormitory_fee) > 0">
+              <div>应付: ¥{{ formatMoney(scope.row.dormitory_fee) }}</div>
+              <div v-if="Number(scope.row.paid_dormitory_detail) > 0" style="color: #67C23A; font-size: 12px;">
+                已付: ¥{{ formatMoney(scope.row.paid_dormitory_detail) }}
+              </div>
             </div>
             <div v-else>-</div>
           </template>
@@ -319,84 +362,18 @@
           </el-col>
         </el-row>
 
-        <!-- 付款明细 -->
+        <!-- 付款明细入口 -->
         <el-divider content-position="left">付款明细</el-divider>
-        <div v-for="(detail, index) in editForm.payment_details" :key="detail.id || ('new-' + index)" class="payment-detail-item" style="border: 1px solid #EBEEF5; border-radius: 4px; padding: 15px; margin-bottom: 15px; background: #FAFAFA;">
-          <el-row :gutter="20">
-            <el-col :span="8">
-              <el-form-item label="付款类型" :label-width="'90px'">
-                <el-select v-model="detail.payment_type" placeholder="请选择" style="width: 100%;" @change="calculateEditBalance">
-                  <el-option label="学费" value="tuition" />
-                  <el-option label="校车费" value="bus" />
-                  <el-option label="宿舍费" value="dormitory" />
-                </el-select>
-              </el-form-item>
-            </el-col>
-            <el-col :span="8">
-              <el-form-item label="付款金额" :label-width="'90px'">
-                <el-input-number v-model="detail.amount" :min="0" :precision="2" :controls="false" style="width: 100%;" placeholder="请输入金额" @change="calculateEditBalance" />
-              </el-form-item>
-            </el-col>
-            <el-col :span="8">
-              <el-form-item label="凭证号" :label-width="'90px'">
-                <el-input v-model="detail.voucher_no" placeholder="请输入凭证号" />
-              </el-form-item>
-            </el-col>
-          </el-row>
-          <el-row :gutter="20">
-            <el-col :span="8">
-              <el-form-item label="付款日期" :label-width="'90px'">
-                <el-date-picker v-model="detail.paid_date" type="date" placeholder="选择日期" value-format="yyyy-MM-dd" style="width: 100%;" />
-              </el-form-item>
-            </el-col>
-            <el-col :span="8">
-              <el-form-item label="付款方" :label-width="'90px'">
-                <el-input v-model="detail.payer_name" placeholder="请输入付款方" />
-              </el-form-item>
-            </el-col>
-            <el-col :span="8">
-              <el-form-item label="卡号" :label-width="'90px'">
-                <el-input v-model="detail.card_no" placeholder="请输入卡号" />
-              </el-form-item>
-            </el-col>
-          </el-row>
-          <el-row :gutter="20">
-            <el-col :span="8">
-              <el-form-item label="银行" :label-width="'90px'">
-                <el-input v-model="detail.bank_name" placeholder="请输入银行" />
-              </el-form-item>
-            </el-col>
-            <el-col :span="8">
-              <el-form-item label="发票号码" :label-width="'90px'">
-                <el-input v-model="detail.invoice_number" placeholder="请输入发票号码" />
-              </el-form-item>
-            </el-col>
-            <el-col :span="8">
-              <el-form-item label="开票金额" :label-width="'90px'">
-                <el-input-number v-model="detail.invoice_amount" :min="0" :precision="2" :controls="false" style="width: 100%;" placeholder="请输入开票金额" />
-              </el-form-item>
-            </el-col>
-          </el-row>
-          <el-row :gutter="20">
-            <el-col :span="12">
-              <el-form-item label="发票内容" :label-width="'90px'">
-                <el-input v-model="detail.invoice_content" placeholder="请输入发票内容" />
-              </el-form-item>
-            </el-col>
-            <el-col :span="12">
-              <el-form-item label="备注" :label-width="'90px'">
-                <el-input v-model="detail.remark" placeholder="请输入备注" />
-              </el-form-item>
-            </el-col>
-          </el-row>
-          <div style="text-align: right;">
-            <el-button type="danger" size="mini" icon="el-icon-delete" @click="removePaymentDetail(index)">删除</el-button>
-          </div>
-        </div>
-        <div style="margin-bottom: 20px;">
-          <el-button type="primary" size="small" icon="el-icon-plus" @click="addPaymentDetail">添加付款明细</el-button>
-          <span v-if="editForm.payment_details.length === 0" style="color: #909399; margin-left: 10px;">暂无付款明细</span>
-        </div>
+        <el-row :gutter="20">
+          <el-col :span="24">
+            <el-form-item>
+              <el-button type="primary" size="small" icon="el-icon-edit" @click="paymentDetailEditDialogVisible = true">
+                编辑付款明细（{{ editForm.payment_details.length }} 条）
+              </el-button>
+              <span v-if="editForm.payment_details.length === 0" style="color: #909399; margin-left: 10px;">暂无付款明细</span>
+            </el-form-item>
+          </el-col>
+        </el-row>
 
         <!-- 付款汇总 -->
         <el-divider content-position="left">付款汇总</el-divider>
@@ -451,10 +428,95 @@
       </div>
     </el-dialog>
 
+    <!-- 编辑付款明细弹窗 -->
+    <el-dialog title="编辑付款明细" :visible.sync="paymentDetailEditDialogVisible" width="900px" :close-on-click-modal="false">
+      <el-form label-width="90px">
+        <div v-for="(detail, index) in editForm.payment_details" :key="detail.id || ('new-' + index)" class="payment-detail-item" style="border: 1px solid #EBEEF5; border-radius: 4px; padding: 15px; margin-bottom: 15px; background: #FAFAFA;">
+          <el-row :gutter="20">
+            <el-col :span="8">
+              <el-form-item label="付款类型">
+              <el-select v-model="detail.payment_type" placeholder="请选择" style="width: 100%;" @change="calculateEditBalance">
+                <el-option label="学费" value="tuition" />
+                <el-option label="校车费" value="bus" />
+                <el-option label="宿舍费" value="dormitory" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="付款金额">
+              <el-input-number v-model="detail.amount" :min="0" :precision="2" :controls="false" style="width: 100%;" placeholder="请输入金额" @change="calculateEditBalance" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="凭证号">
+              <el-input v-model="detail.voucher_no" placeholder="请输入凭证号" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="8">
+            <el-form-item label="付款日期">
+              <el-date-picker v-model="detail.paid_date" type="date" placeholder="选择日期" value-format="yyyy-MM-dd" style="width: 100%;" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="付款方">
+              <el-input v-model="detail.payer_name" placeholder="请输入付款方" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="卡号">
+              <el-input v-model="detail.card_no" placeholder="请输入卡号" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="8">
+            <el-form-item label="银行">
+              <el-input v-model="detail.bank_name" placeholder="请输入银行" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="发票号码">
+              <el-input v-model="detail.invoice_number" placeholder="请输入发票号码" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="开票金额">
+              <el-input-number v-model="detail.invoice_amount" :min="0" :precision="2" :controls="false" style="width: 100%;" placeholder="请输入开票金额" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="发票内容">
+              <el-input v-model="detail.invoice_content" placeholder="请输入发票内容" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="备注">
+              <el-input v-model="detail.remark" placeholder="请输入备注" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <div style="text-align: right;">
+          <el-button type="danger" size="mini" icon="el-icon-delete" @click="removePaymentDetail(index)">删除</el-button>
+        </div>
+      </div>
+      </el-form>
+      <div style="margin-bottom: 20px;">
+        <el-button type="primary" size="small" icon="el-icon-plus" @click="addPaymentDetail">添加付款明细</el-button>
+        <span v-if="editForm.payment_details.length === 0" style="color: #909399; margin-left: 10px;">暂无付款明细</span>
+      </div>
+      <div slot="footer" class="dialog-footer">
+        <el-button @click="paymentDetailEditDialogVisible = false">关闭</el-button>
+      </div>
+    </el-dialog>
+
     <!-- 查看付款明细对话框 -->
-    <el-dialog :title="`${currentPaymentDetailStudent} - 付款明细`" :visible.sync="paymentDetailDialogVisible" width="800px">
-      <el-table :data="currentPaymentDetails" border size="small" style="width: 100%;">
-        <el-table-column prop="payment_type" label="付款类型" align="center" width="100">
+    <el-dialog :title="`${currentPaymentDetailStudent} - 付款明细`" :visible.sync="paymentDetailDialogVisible" width="1100px">
+      <el-table :data="currentPaymentDetails" border size="small" style="width: 100%;" max-height="400">
+        <el-table-column prop="payment_type" label="付款类型" align="center" width="90" fixed="left">
           <template slot-scope="scope">
             <el-tag v-if="scope.row.payment_type === 'tuition'" type="primary" size="mini">学费</el-tag>
             <el-tag v-else-if="scope.row.payment_type === 'bus'" type="success" size="mini">校车费</el-tag>
@@ -465,10 +527,19 @@
         <el-table-column prop="amount" label="付款金额" align="right" width="120">
           <template slot-scope="scope">¥{{ formatMoney(scope.row.amount) }}</template>
         </el-table-column>
-        <el-table-column prop="voucher_no" label="凭证号" align="center" min-width="120" />
+        <el-table-column prop="voucher_no" label="凭证号" align="center" width="120" />
         <el-table-column prop="paid_date" label="付款日期" align="center" width="110" />
-        <el-table-column prop="payer_name" label="付款方" align="center" min-width="100" />
-        <el-table-column prop="invoice_number" label="发票号码" align="center" min-width="120" />
+        <el-table-column prop="payer_name" label="付款方" align="center" width="100" />
+        <el-table-column prop="card_no" label="银行卡号" align="center" width="140" show-overflow-tooltip />
+        <el-table-column prop="bank_name" label="银行名称" align="center" width="120" show-overflow-tooltip />
+        <el-table-column prop="invoice_number" label="发票号码" align="center" width="120" />
+        <el-table-column prop="invoice_amount" label="发票金额" align="right" width="120">
+          <template slot-scope="scope">
+            <span v-if="scope.row.invoice_amount">¥{{ formatMoney(scope.row.invoice_amount) }}</span>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="invoice_content" label="发票内容" align="center" width="120" show-overflow-tooltip />
         <el-table-column prop="remark" label="备注" align="center" min-width="120" show-overflow-tooltip />
       </el-table>
       <div v-if="currentPaymentDetails.length === 0" style="text-align: center; color: #909399; padding: 20px;">暂无付款明细</div>
@@ -509,6 +580,7 @@
 import {
   getTuitionPaymentList,
   getTuitionPaymentGrades,
+  getTuitionPaymentStatistics,
   exportTuitionPayment
 } from '@/api/tuitionPayment'
 
@@ -531,6 +603,13 @@ export default {
       familyOptions: [],
       recordList: [],
       total: 0,
+      statisticsData: {
+        record_count: 0,
+        student_count: 0,
+        total_payable: 0,
+        total_paid: 0,
+        total_balance: 0
+      },
       tableHeight: 600,
       currentRow: null,
       pdfZoomDialogVisible: false,
@@ -543,6 +622,7 @@ export default {
       paymentDetailDialogVisible: false,
       currentPaymentDetails: [],
       currentPaymentDetailStudent: '',
+      paymentDetailEditDialogVisible: false,
       editForm: {
         id: null,
         seq_no: null,
@@ -746,6 +826,9 @@ export default {
           this.recordList = []
           this.total = 0
         }
+
+        // 同时加载统计信息
+        this.loadStatistics(params)
       } catch (error) {
         console.error('加载记录列表失败:', error)
         this.$message.error('加载数据失败')
@@ -757,6 +840,25 @@ export default {
     // 处理记录数据，后端已返回 total_payable / total_paid
     processRecord(record) {
       return record
+    },
+
+    // 加载统计信息
+    async loadStatistics(params) {
+      try {
+        const res = await this.$http.get('/tuition-payment/statistics/', { params })
+        if (res.code === 1 || res.code === 200) {
+          const stats = res.data || {}
+          this.statisticsData = {
+            record_count: stats.record_count || 0,
+            student_count: stats.student_count || 0,
+            total_payable: (stats.tuition?.payable || 0) + (stats.bus_fee?.payable || 0) + (stats.dormitory_fee?.payable || 0),
+            total_paid: (stats.tuition?.paid || 0) + (stats.bus_fee?.paid || 0) + (stats.dormitory_fee?.paid || 0),
+            total_balance: stats.total_balance_due || 0
+          }
+        }
+      } catch (error) {
+        console.error('加载统计信息失败:', error)
+      }
     },
 
     // 学年变化处理
