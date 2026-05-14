@@ -71,6 +71,7 @@
     <!-- 操作栏 -->
     <el-card class="operate-container" shadow="never" style="margin-top: 15px;">
       <div class="table-operation">
+        <el-button type="primary" icon="el-icon-plus" @click="handleAdd">新增</el-button>
         <el-button type="success" icon="el-icon-download" @click="handleExport">导出数据</el-button>
         <el-button icon="el-icon-refresh" @click="refreshData">刷新</el-button>
       </div>
@@ -223,7 +224,7 @@
     </div>
 
     <!-- 编辑对话框 -->
-    <el-dialog title="查看详情" :visible.sync="editDialogVisible" width="900px">
+    <el-dialog :title="isEdit ? '编辑记录' : '新增记录'" :visible.sync="editDialogVisible" width="900px">
       <div style="text-align: right; margin-bottom: 15px;">
         <el-button
           v-if="editForm.tuition_pdf_url"
@@ -240,11 +241,6 @@
         <!-- 基础信息 -->
         <el-divider content-position="left">基础信息</el-divider>
         <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="序号">
-              <el-input-number v-model="editForm.seq_no" :min="0" :precision="0" style="width: 100%;" />
-            </el-form-item>
-          </el-col>
           <el-col :span="12">
             <el-form-item label="学生姓名">
               <el-input v-model="editForm.student_name" placeholder="请输入学生姓名" />
@@ -266,7 +262,18 @@
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="学费期间">
-              <div class="readonly-field">{{ editForm.tuition_period || '-' }}</div>
+              <el-date-picker
+                v-if="!isEdit"
+                v-model="editForm.tuitionPeriodRange"
+                type="daterange"
+                range-separator="-"
+                start-placeholder="开始日期"
+                end-placeholder="结束日期"
+                value-format="yyyy-MM-dd"
+                style="width: 100%;"
+                @change="val => handlePeriodChange('tuition', val)"
+              />
+              <div v-else class="readonly-field">{{ editForm.tuition_period || '-' }}</div>
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -277,40 +284,46 @@
         </el-row>
 
         <!-- 学费信息 -->
-        <el-divider content-position="left">学费信息（由学费单生成，只读）</el-divider>
+        <el-divider content-position="left">学费信息<span v-if="isEdit">（由学费单生成，只读）</span></el-divider>
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="学费期间天数">
-              <div class="readonly-field">{{ editForm.tuition_days || '-' }} 天</div>
+              <el-input-number v-if="!isEdit" v-model="editForm.tuition_days" :min="0" :precision="0" :controls="false" style="width: 100%;" />
+              <div v-else class="readonly-field">{{ editForm.tuition_days || '-' }} 天</div>
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="标准学费">
-              <div class="readonly-field">¥{{ formatMoney(editForm.base_tuition) }}</div>
+              <el-input-number v-if="!isEdit" v-model="editForm.base_tuition" :min="0" :precision="2" :controls="false" style="width: 100%;" />
+              <div v-else class="readonly-field">¥{{ formatMoney(editForm.base_tuition) }}</div>
             </el-form-item>
           </el-col>
         </el-row>
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="注册费">
-              <div class="readonly-field">¥{{ formatMoney(editForm.registration_fee) }}</div>
+              <el-input-number v-if="!isEdit" v-model="editForm.registration_fee" :min="0" :precision="2" :controls="false" style="width: 100%;" />
+              <div v-else class="readonly-field">¥{{ formatMoney(editForm.registration_fee) }}</div>
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="家庭折扣">
-              <div class="readonly-field">¥{{ formatMoney(editForm.family_discount) }}</div>
+              <el-input-number v-if="!isEdit" v-model="editForm.family_discount" :min="0" :precision="2" :controls="false" style="width: 100%;" placeholder="留空表示无此项" />
+              <div v-else class="readonly-field">¥{{ formatMoney(editForm.family_discount) }}</div>
             </el-form-item>
           </el-col>
         </el-row>
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="其他折扣">
-              <div class="readonly-field">¥{{ formatMoney(editForm.other_discount) }}</div>
+              <el-input-number v-if="!isEdit" v-model="editForm.other_discount" :min="0" :precision="2" :controls="false" style="width: 100%;" placeholder="留空表示无此项" />
+              <div v-else class="readonly-field">¥{{ formatMoney(editForm.other_discount) }}</div>
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="应付学费">
-              <div class="readonly-field highlight">¥{{ formatMoney(editForm.tuition_payable) }}</div>
+              <el-input-number v-if="!isEdit" v-model="editForm.tuition_payable" :min="0" :precision="2" :controls="false" style="width: 100%;" />
+              <div v-else class="readonly-field highlight">¥{{ formatMoney(editForm.tuition_payable) }}</div>
             </el-form-item>
           </el-col>
         </el-row>
@@ -616,6 +629,7 @@ export default {
       zoomPdfUrl: '',
       editDialogVisible: false,
       editLoading: false,
+      isEdit: false,
       exportDialogVisible: false,
       exportAcademicYear: '',
       exportGrades: [],
@@ -625,7 +639,6 @@ export default {
       paymentDetailEditDialogVisible: false,
       editForm: {
         id: null,
-        seq_no: null,
         student_no: '',
         student_name: '',
         invoice_no: '',
@@ -918,8 +931,62 @@ export default {
       return parts[parts.length - 1] || '学费单.pdf'
     },
 
+    // 重置编辑表单
+    resetEditForm() {
+      this.editForm = {
+        id: null,
+        student_no: '',
+        student_name: '',
+        invoice_no: '',
+        tuition_period: '',
+        tuitionPeriodRange: [],
+        grade: '',
+        base_tuition: 0,
+        registration_fee: 0,
+        family_discount: undefined,
+        other_discount: undefined,
+        tuition_payable: 0,
+        tuition_days: 0,
+        bus_fee_period: '',
+        busFeePeriodRange: [],
+        school_bus_fee: 0,
+        dormitory_period: '',
+        dormitoryPeriodRange: [],
+        dormitory_fee: 0,
+        tuition_voucher_no: '',
+        paid_tuition_fee: 0,
+        bus_voucher_no: '',
+        paid_bus_fee: 0,
+        dormitory_voucher_no: '',
+        paid_dormitory_fee: 0,
+        paid_date: '',
+        balance_due: 0,
+        actual_paid_amount: 0,
+        payer_name: '',
+        card_no: '',
+        bank_name: '',
+        invoice_number: '',
+        invoice_amount: undefined,
+        invoice_content: '',
+        samsung_special_remark: '',
+        remark: '',
+        payment_details: []
+      }
+    },
+
+    // 打开新增对话框
+    handleAdd() {
+      this.isEdit = false
+      this.resetEditForm()
+      this.editDialogVisible = true
+      this.$nextTick(() => {
+        this.$refs.editForm && this.$refs.editForm.clearValidate()
+      })
+    },
+
     // 打开编辑对话框
     async handleEdit(row) {
+      this.isEdit = true
       const numeric = (val) => parseFloat(val) || 0
       try {
         // 先获取完整详情（列表页不返回 payment_details）
@@ -928,7 +995,6 @@ export default {
 
         this.editForm = {
           id: detail.id,
-          seq_no: detail.seq_no || null,
           student_no: detail.student_no || '',
           student_name: detail.student_name || '',
           invoice_no: detail.invoice_no || '',
@@ -1118,7 +1184,6 @@ export default {
         })
 
         const payload = {
-          seq_no: this.editForm.seq_no || null,
           student_no: this.editForm.student_no || null,
           student_name: this.editForm.student_name || null,
           invoice_no: this.editForm.invoice_no || null,
@@ -1139,8 +1204,13 @@ export default {
           remark: this.editForm.remark || null,
           payment_details: paymentDetails
         }
-        await this.$http.put(`/tuition-payment/${this.editForm.id}/`, payload)
-        this.$message.success('更新成功')
+        if (this.isEdit) {
+          await this.$http.put(`/tuition-payment/${this.editForm.id}/`, payload)
+          this.$message.success('更新成功')
+        } else {
+          await this.$http.post('/tuition-payment/', payload)
+          this.$message.success('创建成功')
+        }
         this.editDialogVisible = false
         this.loadRecordList()
       } catch (error) {

@@ -181,45 +181,13 @@
         <el-divider content-position="left">基本信息</el-divider>
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="选择学生">
-              <div v-if="isEdit" style="line-height: 36px; padding: 0 15px; border: 1px solid #dcdfe6; border-radius: 4px; background-color: #f5f7fa;">
-                {{ tuitionForm.student_name }}
-                <span v-if="tuitionForm.student_no_xf" style="color: #909399; font-size: 12px;">({{ tuitionForm.student_no_xf }})</span>
-              </div>
-              <el-select
-                v-else
-                v-model="tuitionForm.student"
-                placeholder="请选择已有学生（可选）"
-                filterable
-                clearable
-                style="width: 100%;"
-                @change="handleStudentSelect"
-              >
-                <el-option
-                  v-for="item in studentOptions"
-                  :key="item.id"
-                  :label="`${item.last_name} ${item.first_name} (${item.english_name})`"
-                  :value="item.id"
-                />
-              </el-select>
-              <span v-if="!isEdit" class="form-tip">选择学生可自动填充信息，也可直接输入下方信息创建新记录</span>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
             <el-form-item label="学号" prop="student_no_xf">
-              <el-input v-model="tuitionForm.student_no_xf" placeholder="请输入学号" :disabled="isEdit" />
+              <el-input v-model="tuitionForm.student_no_xf" placeholder="请输入学号" />
             </el-form-item>
           </el-col>
-        </el-row>
-        <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="学生姓名">
+            <el-form-item label="学生姓名" prop="student_name">
               <el-input v-model="tuitionForm.student_name" placeholder="请输入学生姓名" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="年级">
-              <el-input v-model="tuitionForm.grade" placeholder="请输入年级，如 P1, M1" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -232,15 +200,20 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="invoice_no 号码" prop="invoice_no">
-              <el-input v-model="tuitionForm.invoice_no" placeholder="请输入invoice_no 号码" />
+            <el-form-item label="家庭编号" prop="family_number">
+              <el-input v-model="tuitionForm.family_number" placeholder="请输入家庭编号" @input="handleFamilyNumberInput" />
             </el-form-item>
           </el-col>
         </el-row>
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="原始家庭编号">
-              <el-input v-model="tuitionForm.family_number" placeholder="请输入原始家庭编号" @input="handleFamilyNumberInput" />
+            <el-form-item label="年级" prop="grade">
+              <el-input v-model="tuitionForm.grade" placeholder="请输入年级，如 P1, M1" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="invoice_no 号码" prop="invoice_no">
+              <el-input v-model="tuitionForm.invoice_no" placeholder="请输入invoice_no 号码" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -249,19 +222,19 @@
         <el-divider content-position="left">个人信息</el-divider>
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="出生日期">
+            <el-form-item label="出生日期" prop="dob">
               <el-date-picker v-model="tuitionForm.dob" type="date" placeholder="选择出生日期" value-format="yyyy-MM-dd" style="width: 100%;" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="入学日期">
+            <el-form-item label="入学日期" prop="enrollment_date">
               <el-date-picker v-model="tuitionForm.enrollment_date" type="date" placeholder="选择入学日期" value-format="yyyy-MM-dd" style="width: 100%;" />
             </el-form-item>
           </el-col>
         </el-row>
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="家长邮箱1">
+            <el-form-item label="家长邮箱1" prop="parent1_email_address">
               <el-input v-model="tuitionForm.parent1_email_address" placeholder="请输入家长邮箱1" />
             </el-form-item>
           </el-col>
@@ -592,7 +565,13 @@ export default {
       emailSending: false,
       rules: {
         student_no_xf: [{ required: true, message: '请输入学号', trigger: 'blur' }],
-        invoice_no: [{ required: true, message: '请输入invoice_no 号码', trigger: 'blur' }]
+        invoice_no: [{ required: true, message: '请输入invoice_no 号码', trigger: 'blur' }],
+        student_name: [{ required: true, message: '请输入学生姓名', trigger: 'blur' }],
+        grade: [{ required: true, message: '请输入年级', trigger: 'blur' }],
+        family_number: [{ required: true, message: '请输入原始家庭编号', trigger: 'blur' }],
+        dob: [{ required: true, message: '请选择出生日期', trigger: 'change' }],
+        enrollment_date: [{ required: true, message: '请选择入学日期', trigger: 'change' }],
+        parent1_email_address: [{ validator: this.validateParentEmail, trigger: 'blur' }]
       }
     }
   },
@@ -1024,7 +1003,7 @@ export default {
       this.selectedRows = val
     },
 
-    // 输入原始家庭编号时实时自动生成 invoice_no
+    // 输入家庭编号时实时自动生成 invoice_no
     handleFamilyNumberInput(val) {
       const familyNumber = String(val || '').trim()
       const academicYear = this.tuitionForm.academic_year || this.listQuery.academic_year || this.getDefaultAcademicYear()
@@ -1296,6 +1275,17 @@ export default {
       }
     },
 
+    // 验证家长邮箱（至少填一个）
+    validateParentEmail(rule, value, callback) {
+      const p1 = this.tuitionForm.parent1_email_address
+      const p2 = this.tuitionForm.parent2_email_address
+      if (!p1 && !p2) {
+        callback(new Error('家长邮箱1和家长邮箱2至少填一个'))
+      } else {
+        callback()
+      }
+    },
+
     async handleSubmit() {
       this.$refs.tuitionForm.validate(async(valid) => {
         if (valid) {
@@ -1371,7 +1361,28 @@ export default {
             this.getList()
           } catch (error) {
             console.error('提交失败:', error)
-            this.$message.error(this.isEdit ? '更新失败' : '新增失败')
+            const errData = error.response?.data
+            let errMsg = ''
+            if (errData) {
+              if (typeof errData === 'string') {
+                errMsg = errData
+              } else if (typeof errData === 'object') {
+                const msgs = []
+                for (const key in errData) {
+                  const val = errData[key]
+                  if (Array.isArray(val)) {
+                    msgs.push(`${key}: ${val.join(', ')}`)
+                  } else if (typeof val === 'string') {
+                    msgs.push(`${key}: ${val}`)
+                  }
+                }
+                errMsg = msgs.join('\n')
+              }
+            }
+            this.$message.error({
+              message: (this.isEdit ? '更新失败' : '新增失败') + (errMsg ? `\n${errMsg}` : ''),
+              duration: 5000
+            })
           }
         }
       })
